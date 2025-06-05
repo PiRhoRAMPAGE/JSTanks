@@ -1,0 +1,287 @@
+* {
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    /* Default to vertical stacking */
+    justify-content: center;
+    /* Center items horizontally */
+    align-items: center;
+    /* Center items vertically */
+    height: 100vh;
+    background-color: #000000;
+}
+
+h3 {
+    font-family: "Press Start 2P";
+}
+
+
+
+
+
+#bgImage {
+    display: none;
+}
+
+#divOptions {
+    position: absolute;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    z-index: 9999;
+}
+
+canvas {
+    border: 1px solid white;
+    border-radius: 7px;
+    background-color: #888888;
+    position: relative;
+    height: auto;
+    width: 83vw;
+}
+
+#overlay {
+    position: absolute;
+    left: 5vw;
+    top: 5vh;
+    width: 90vw;
+    height: 90vh;
+    color: white;
+    background-color: black;
+    z-index: 9999;
+    display: none;
+}
+
+#divTanks {
+    position: absolute;
+    top: 0vh;
+    left: 0vw;
+    width: 100vw;
+    height: 100vh;
+    color: white;
+    background-color: black;
+}
+
+#divTanks > * {
+    position: static;
+    margin-right: 10px;
+    margin-bottom: 10px;
+    text-align: center;
+}
+
+#selTankA, #selTankB {
+    margin-right: 10px;
+    margin-bottom: 10px;
+    width: 50vw;
+    text-align: center;
+    color: white;
+    background-color: black;
+    border-radius: 2px;
+}
+
+#h3Title {
+    margin-top: 40vh;
+    margin-bottom: 20px;
+}
+
+#btnStartGame {
+    font-family: "Press Start 2P";
+    padding-left: 5px;
+    padding-right: 5px;
+    margin-right: 10px;
+    margin-bottom: 10px;
+    color: white;
+    border: none;
+    background-color: transparent;
+}
+#btnStartGame:hover {
+    cursor: pointer;
+}
+
+#btnResetLeaderboard {
+    padding-top: 20px;
+    font-size: 10px;
+    font-family: "Press Start 2P";
+    color: white;
+    border: none;
+    background-color: transparent;
+}
+#btnResetLeaderboard:hover {
+    cursor: pointer;
+}
+
+
+#btnLeaderboard {
+    margin-right: 10px;
+    margin-bottom: 10px;
+    font-size: 9px;
+    font-family: "Press Start 2P";
+    color: white;
+    border: none;
+    background-color: transparent;
+    z-index: 9999;
+}
+#btnLeaderboard:hover {
+    cursor: pointer;
+}
+#divLeaderboard {
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    width: 100vw;
+    height: 95vh;
+    background-color: black;
+    color: white;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    /* Default to vertical stacking */
+    align-items: center;
+    /* Center items vertically */
+    height: 100vh;
+    background-color: #000000;
+    display: none;
+    overflow: auto;
+}
+#tblLeaderboard {
+    margin-top: 10px;
+    background-color: #222222;
+}
+#tblLeaderboard td, #tblLeaderboard tr {
+    border-top: 1px solid black;
+    padding-left: 20px;
+    padding-right: 20px;
+}
+.trHeader {
+    background-color: #3c3c3c;
+}
+
+#selSpeed {
+    margin-right: 10px;
+    margin-bottom: 10px;
+    color: white;
+    background-color: black;
+    border-radius: 2px;
+}
+
+#toggleView {
+    position: static;
+    /* Allow it to flow within divOptions */
+    width: auto;
+    /* Adjust as needed */
+    margin-right: 10px;
+    /* Add spacing */
+    margin-bottom: 10px;
+}
+
+#toggleViewLabel {
+    position: static;
+    /* Allow it to flow within divOptions */
+    margin-right: 15px;
+    /* Add spacing */
+    margin-bottom: 10px;
+}
+
+#toggleSound {
+    position: static;
+    /* Allow it to flow within divOptions */
+    width: auto;
+    /* Adjust as needed */
+    margin-right: 10px;
+    /* Add spacing */
+    margin-bottom: 10px;
+}
+
+#toggleSoundLabel {
+    position: static;
+    /* Allow it to flow within divOptions */
+    margin-bottom: 10px;
+}
+
+#toggleBlocking {
+    position: static;
+    /* Allow it to flow within divOptions */
+    width: auto;
+    /* Adjust as needed */
+    margin-right: 10px;
+    /* Add spacing */
+    margin-bottom: 10px;
+}
+
+#toggleBlockingLabel {
+    position: static;
+    /* Allow it to flow within divOptions */
+    margin-bottom: 10px;
+}
+
+#togglePowerups {
+    position: static;
+    /* Allow it to flow within divOptions */
+    width: auto;
+    /* Adjust as needed */
+    margin-right: 10px;
+    /* Add spacing */
+    margin-bottom: 10px;
+}
+
+#togglePowerupsLabel {
+    position: static;
+    /* Allow it to flow within divOptions */
+    margin-bottom: 10px;
+}
+
+
+/* When screen width is greater than height (landscape orientation) */
+@media (min-width: 1px) and (orientation: landscape) {
+    body {
+        flex-direction: row;
+        justify-content: center;
+        align-items: center;
+    }
+
+    #divOptions {
+        top: 10px;
+        left: 10px;
+        flex-direction: column;
+        margin: 0;
+        align-items: flex-start;
+        z-index: 9999;
+    }
+
+
+    canvas {
+        height: 83vh;
+        width: auto;
+    }
+}
+
+/* When screen height is greater than or equal to width (portrait orientation) */
+@media (min-width: 1px) and (orientation: portrait) {
+
+    /* Keep the default flexbox layout for portrait */
+    #divOptions {
+        margin-top: 20px;
+        margin-bottom: 20px;
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+    }
+
+    #divOptions {
+        top: 93vh;
+        left: auto;
+        flex-direction: row;
+        margin: 0;
+        align-items: flex-start;
+        z-index: 9999;
+    }
+
+    #divOptions > * {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+}

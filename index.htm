@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>JS Tanks</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="./css/style.css" type="text/css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div id="divLeaderboard"></div>
+    <canvas id="canvas" width="400" height="400"></canvas>
+    <div id="divTanks">
+        <h3 id="h3Title">
+            Select Tanks
+        </h3>
+        <div id="divTankA" title="Select AI for Tank A">
+            <select id="selTankA"></select>
+        </div>
+        <div id="divTankB" title="Select AI for Tank B">
+            <select id="selTankB"></select>
+        </div>
+        <div id="divStartGame">
+            <button id="btnStartGame">Start Game</button>
+        </div>
+    </div>
+    <div id="overlay"></div>
+    <div id="divOptions">
+        <button id="btnLeaderboard">
+            <center>
+                Show<br>
+                Ranks
+            </center>
+        </button>
+        <div id="divSpeed" title="Select the game speed">
+            <select id="selSpeed"></select>
+        </div>
+        <div id="divView" title="View game statistics">
+            <input id="toggleView" type="checkbox" checked>
+            <label id="toggleViewLabel" for="toggleView">🎥</label>
+        </div>
+        <div id="divSound" title="Disable sound">
+            <input id="toggleSound" type="checkbox" checked>
+            <label id="toggleSoundLabel" for="toggleSound">🔇</label>
+        </div>
+        <div id="divPowerups" title="Enable powerups">
+            <input id="togglePowerups" type="checkbox" checked>
+            <label id="togglePowerupsLabel" for="togglePowerups">⚡️️</label>
+        </div>
+        <div id="divBlocking" title="Allow missile interception">
+            <input id="toggleBlocking" type="checkbox" checked>
+            <label id="toggleBlockingLabel" for="toggleBlocking">🛡️</label>
+        </div>
+    </div>
+    <img alt="background image" id="bgImage" src="./assets/bg.png">
+    <script src="./scripts/math.js"></script>
+    <script src="./tanks/tanklist.js"></script>
+    <script src="./scripts/constants.js"></script>
+    <script src="./scripts/gamepad.js"></script>
+    <script src="./scripts/controls.js"></script>
+    <script src="./scripts/sounds.js"></script>
+    <script src="./scripts/colors.js"></script>
+    <script src="./scripts/missileclass.js"></script>
+    <script src="./scripts/powerupclass.js"></script>
+    <script src="./scripts/tankclass.js"></script>
+    <script src="./scripts/tankselector.js"></script>
+    <script src="./scripts/main.js"></script>
+</body>
+
+</html>
