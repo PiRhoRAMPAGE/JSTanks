@@ -66,14 +66,15 @@ canvas {
     background-color: black;
 }
 
-#divTanks > * {
+#divTanks>* {
     position: static;
     margin-right: 10px;
     margin-bottom: 10px;
     text-align: center;
 }
 
-#selTankA, #selTankB {
+#selTankA,
+#selTankB {
     margin-right: 10px;
     margin-bottom: 10px;
     width: 50vw;
@@ -98,6 +99,7 @@ canvas {
     border: none;
     background-color: transparent;
 }
+
 #btnStartGame:hover {
     cursor: pointer;
 }
@@ -110,6 +112,7 @@ canvas {
     border: none;
     background-color: transparent;
 }
+
 #btnResetLeaderboard:hover {
     cursor: pointer;
 }
@@ -125,9 +128,26 @@ canvas {
     background-color: transparent;
     z-index: 9999;
 }
+
 #btnLeaderboard:hover {
     cursor: pointer;
 }
+
+#btnEvaluate {
+    margin-right: 10px;
+    margin-bottom: 10px;
+    font-size: 9px;
+    font-family: "Press Start 2P";
+    color: white;
+    border: none;
+    background-color: transparent;
+    z-index: 9999;
+}
+
+#btnEvaluate:hover {
+    cursor: pointer;
+}
+
 #divLeaderboard {
     position: absolute;
     top: 0px;
@@ -147,15 +167,19 @@ canvas {
     display: none;
     overflow: auto;
 }
+
 #tblLeaderboard {
     margin-top: 10px;
     background-color: #222222;
 }
-#tblLeaderboard td, #tblLeaderboard tr {
+
+#tblLeaderboard td,
+#tblLeaderboard tr {
     border-top: 1px solid black;
     padding-left: 20px;
     padding-right: 20px;
 }
+
 .trHeader {
     background-color: #3c3c3c;
 }
@@ -280,7 +304,7 @@ canvas {
         z-index: 9999;
     }
 
-    #divOptions > * {
+    #divOptions>* {
         padding-left: 10px;
         padding-right: 10px;
     }

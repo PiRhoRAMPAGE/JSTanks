@@ -7,7 +7,7 @@
 - Create a JavaScript (.js) file in the `/tanks` directory with the same name as your tank (tankname.js).
 - Implement your tanks logic in the `main` function of the JavaScript file you created.
 - The `main` function accepts `tank` and `arena` objects as arguments and must return the modified `tank` object.
-- Avoid writing code outside of the `main` function to prevent global scope issues. Use `tank.retained` for persistent data.
+- Avoid writing code outside the `main` function to prevent global scope issues. Use `tank.retained` for persistent data.
 - See `/tanks/example.js` for help.
 
 
@@ -58,10 +58,10 @@ the challenge. For fair play, limit your code's interaction exclusively to the p
 | `DEGREES`                        | Number       | The conversion factor for converting radians to degrees (equal to `180 / Math.PI`).
 | `RADIANS`                        | Number       | The conversion factor for converting degrees to radians (equal to `Math.PI / 180`).
 | `MAX_ITERATIONS`                 | Number       | The maximum number of iterations a match can run for.
-| `DAMAGE_DEALT_POINTS`            | Number       | The amount of points awarded for for damage your tank deals to other tanks (this amount is multiplied by the damage dealt at every shot).
+| `DAMAGE_DEALT_POINTS`            | Number       | The amount of points awarded for damage your tank deals to other tanks (this amount is multiplied by the damage dealt at every shot).
 | `SURVIVAL_BONUS_POINTS`          | Number       | The amount of bonus points awarded to the winner of the match for survival (this amount is multiplied by the winner's remaining energy at the end of the match).
 | `ACCURACY_BONUS_POINTS`          | Number       | The amount of bonus points awarded to the winner of the match for accuracy (this amount is multiplied by the winner's accuracy percentage at the end of the match).
-| `TANK_SPEED_BONUS_POINTS`        | Number       | The amount of points awarded for for absolute speed of your tank (this amount is multiplied by the absolute value of the speed of your tank during every iteration).
+| `TANK_SPEED_BONUS_POINTS`        | Number       | The amount of points awarded for absolute speed of your tank (this amount is multiplied by the absolute value of the speed of your tank during every iteration).
 | `MISSILE_ENERGY_MULTIPLIER`      | Number       | The multiplier for missile energy.
 | `GUN_HEAT_MULTIPLIER             | Number       | The multiplier for `gunHeat` for tanks.
 | `MAX_GUN_HEAT`                   | Number       | The maximum possible `gunHeat` for tanks.
@@ -122,7 +122,7 @@ the challenge. For fair play, limit your code's interaction exclusively to the p
 |    - `size`                      | Number       | The physical size (radius) of the specified missile.
 |    - `miss`                      | Boolean      | `true` if the specified missile has hit a wall or ran out of energy, `false` otherwise.
 |    - `hit`                       | Boolean      | `true` if the specified missile has hit a tank, `false` otherwise.
-| `tank.detectedTanks[index]`      | Array        | Data about a mtank detected by your radar at the given `index` (sorted by distance).
+| `tank.detectedTanks[index]`      | Array        | Data about a tank detected by your radar at the given `index` (sorted by distance).
 |    - `index`                     | Number       | The index of the detected tank.
 |    - `name`                      | String       | The name of the detected tank.
 |    - `energy`                    | Number       | The amount of energy the detected tank has remaining.
@@ -156,7 +156,7 @@ the challenge. For fair play, limit your code's interaction exclusively to the p
 |    - `type`                      | Number       | The type of powerup.
 |    - `angleTo`                   | Number       | The angle (in degrees) from your tank to the detected missile.
 |    - `distance`                  | Number       | The distance between your tank and the detected missile.
-|    - `duration`                  | Number       | The duration in intervals until this powerup disapears from the screen.
+|    - `duration`                  | Number       | The duration in intervals until this powerup disappears from the screen.
 |    - `x`                         | Number       | The current x-coordinate of the detected powerup in the arena.
 |    - `y`                         | Number       | The current y-coordinate of the detected powerup in the arena.
 
@@ -175,7 +175,7 @@ the challenge. For fair play, limit your code's interaction exclusively to the p
 | `tank.radarColor`                | String      | Hexadecimal Code       | "#00FFFF"     | The color of your tank's radar.
 | `tank.speed`                     | Number      | -1 to 1                | 0             | The desired speed of your tank, where `-1` is full reverse, `0` is stop, and `1` is full forward. The actual speed is determined by `tank.speed * MAX_ACTUAL_SPEED`.
 | `tank.bodyTurn`                  | Number      | -1 to 1                | 0             | How much to turn the tank's body per iteration (`-1` = `MAX_BODY_TURN_DEGREES` left, `0` no turn, `1` = `MAX_BODY_TURN_DEGREES` right).
-| `tank.gunTurn`                   | Number      | -1 to 1                | 0             | How much to turn the tank's turret relative to the body per iteration (`-1` = `MAX_GUN_TURN_DEGREES` left, `0` no turn, `1` = `MAX_GUN_TURN_DEGREES` right)..
+| `tank.gunTurn`                   | Number      | -1 to 1                | 0             | How much to turn the tank's turret relative to the body per iteration (`-1` = `MAX_GUN_TURN_DEGREES` left, `0` no turn, `1` = `MAX_GUN_TURN_DEGREES` right).
 | `tank.radarTurn`                 | Number      | -1 to 1                | 0             | How much to turn the radar relative to the body and gun per iteration (`-1` = `MAX_RADAR_TURN_DEGREES` left, `0` no turn, `1` = `MAX_RADAR_TURN_DEGREES` right).
 | `tank.radarArc`                  | Number      | 0 to 1                 | 1             | The width of your radar's scanning arc (`0` = 0 degrees, `1` = `MAX_RADAR_ARC_DEGREES` degrees).
 | `tank.handicap`                  | Number      | 0 to 1                 | 0             | An optional handicap (`0` full damage, `1` no damage). Higher values reduce damage dealt to targets.

@@ -1,4 +1,3 @@
-let gameId = 0;
 let gameOver = false;
 let iteration = 0;
 let tanks = [];
@@ -529,11 +528,6 @@ function logGameData(winner) {
         "Match Winner": winner.name,
         "Game Winner": `${gameWinner} (${winPercentage[gameWinner]}%)`,
     }
-    const stats = {
-        "matches": gameCount,
-        "game_stats": gameStats,
-        "match_stats": matchStats
-    }
     console.log(`%c Matches ${gameCount}`, "font-size: 32px;");
     console.table(gameStats);
     console.table(matchStats);
@@ -780,11 +774,10 @@ function calculateElos(a, b, winner) {
     // Calculate new Elo ratings
     const newEloA = RATING_A + K_FACTOR * (actualScoreA - expectedScoreA);
     const newEloB = RATING_B + K_FACTOR * (actualScoreB - expectedScoreB);
-    const elos = {
+    return {
         a: newEloA,
         b: newEloB
     };
-    return elos;
 }
 
 document.getElementById("divLeaderboard").innerHTML = generateLeaderboardTable();

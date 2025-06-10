@@ -1,4 +1,5 @@
 const tankList = [
+    "b",
     "rampage",
     "vilp",
     "micky",
