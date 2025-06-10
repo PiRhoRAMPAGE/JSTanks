@@ -106,11 +106,11 @@ class TankEvaluator {
         const originalShowAnimation = showAnimation.checked;
         const originalSpeed = document.getElementById("selSpeed").value;
         const originalPowerups = powerupsEnabled.checked;
+        const originalBlocking = allowBlocking.checked;
 
         // Set up for fast evaluation
         showAnimation.checked = false;
         document.getElementById("selSpeed").value = MAX_ITERATIONS;
-        powerupsEnabled.checked = false;
 
         // Set the tanks in the UI
         const tankASelect = document.getElementById("selTankA");
@@ -187,6 +187,7 @@ class TankEvaluator {
                 showAnimation.checked = originalShowAnimation;
                 document.getElementById("selSpeed").value = originalSpeed;
                 powerupsEnabled.checked = originalPowerups;
+                allowBlocking.checked = originalBlocking;
 
                 // Hide the progress display
                 overlay.style.display = "none";
