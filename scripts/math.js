@@ -38,3 +38,103 @@ Math.ATAN2 = (angle) => {
     const index = Math.round((normalizedAngle / (2 * Math.PI)) * (ATAN2_TABLE_SIZE - 1));
     return ATAN2_LOOKUP[index];
 };
+
+class Angle {
+    constructor(radians) {
+        this._radians = radians;
+    }
+
+    static fromDegrees(degrees) {
+        return new Angle(degrees * Math.PI / 180.0)
+    }
+
+    get degrees() {
+        return this._radians * 180.0 / Math.PI;
+    }
+
+    get radians() {
+        return this._radians;
+    }
+
+    div(scalar) {
+        return new Angle(this.radians / scalar);
+    }
+
+    difference(other) {
+        const normalization = Math.PI * 2000;
+        let a1 = (this._radians + normalization) % (2.0 * Math.PI);
+        let a2 = (other._radians + normalization) % (2.0 * Math.PI);
+        if (a1 > Math.PI) a1 -= (2.0 * Math.PI);
+        if (a2 > Math.PI) a2 -= (2.0 * Math.PI);
+        return new Angle((a2 - a1 + Math.PI) % (2.0 * Math.PI) - Math.PI);
+    }
+
+    clamp(min, max) {
+        return new Angle(Math.max(min.radians, Math.min(max.radians, this.radians)));
+    }
+}
+
+class Vector2 {
+    constructor(x, y) {
+        this._x = x;
+        this._y = y;
+    }
+
+    polarOffset(speed, angle) {
+        return new Vector2(this._x + speed * Math.cos(angle.radians), this._y + speed * Math.sin(angle.radians))
+    }
+
+    distanceTo(other) {
+        return Math.sqrt((this._x - other._x) ** 2 + (this._y - other._y) ** 2)
+    }
+}
+
+class ArenaBounds {
+    constructor(width, height) {
+        this._halfWidth = width / 2;
+        this._halfHeight = height / 2;
+    }
+
+    contains(position, margin = 0) {
+        return Math.abs(position._x) < this._halfWidth - margin &&
+            Math.abs(position._y) < this._halfHeight - margin;
+    }
+
+    distanceToWall(position) {
+        const leftWallDistance = Math.abs(-this._halfWidth - position._x);
+        const rightWallDistance = Math.abs(this._halfWidth - position._x);
+        const topWallDistance = Math.abs(-this._halfHeight - position._y);
+        const bottomWallDistance = Math.abs(this._halfHeight - position._y);
+
+        return Math.min(leftWallDistance, rightWallDistance, topWallDistance, bottomWallDistance);
+    }
+
+    nearestWallAngle(position) {
+        const leftWallDistance = Math.abs(-this._halfWidth - position._x);
+        const rightWallDistance = Math.abs(this._halfWidth - position._x);
+        const topWallDistance = Math.abs(-this._halfHeight - position._y);
+        const bottomWallDistance = Math.abs(this._halfHeight - position._y);
+
+        let wallDistance = Infinity;
+        let wallAngle = 0;
+
+        if (leftWallDistance < wallDistance) {
+            wallDistance = leftWallDistance;
+            wallAngle = Math.PI; // 180 degrees
+        }
+        if (rightWallDistance < wallDistance) {
+            wallDistance = rightWallDistance;
+            wallAngle = 0; // 0 degrees
+        }
+        if (topWallDistance < wallDistance) {
+            wallDistance = topWallDistance;
+            wallAngle = -Math.PI / 2; // -90 degrees
+        }
+        if (bottomWallDistance < wallDistance) {
+            wallDistance = bottomWallDistance;
+            wallAngle = Math.PI / 2; // 90 degrees
+        }
+
+        return new Angle(wallAngle);
+    }
+}
