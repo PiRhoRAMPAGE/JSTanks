@@ -1,19 +1,49 @@
 function main(tank, arena) {
-  // Constants for angle calculations
-  const FULL_ANGLE_DEGREES = 360;
-  const HALF_ANGLE_DEGREES = 180;
-  const ANGLE_NORMALIZATION = 360000; // Large number to ensure positive modulo result
+  class Angle {
+    constructor(radians) {
+      this._radians = radians;
+    }
 
-  // Physics and game mechanics constants
-  const DEGREES = Math.PI / 180; // Conversion from degrees to radians
-  const MAX_RADAR_ARC_DEGREES = 180; // Maximum radar arc in degrees
+    static fromDegrees(degrees) {
+      return new Angle(degrees * Math.PI / 180.0)
+    }
+
+    get degrees() {
+      return this._radians * 180.0 / Math.PI;
+    }
+
+    get radians() {
+      return this._radians;
+    }
+
+    div(scalar) {
+      return new Angle(this.radians / scalar);
+    }
+
+    difference(other) {
+      const normalization = Math.PI * 2000;
+      let a1 = (this._radians + normalization) % (2.0 * Math.PI);
+      let a2 = (other._radians + normalization) % (2.0 * Math.PI);
+      if (a1 > Math.PI) a1 -= (2.0 * Math.PI);
+      if (a2 > Math.PI) a2 -= (2.0 * Math.PI);
+      return new Angle((a2 - a1 + Math.PI) % (2.0 * Math.PI) - Math.PI);
+    }
+
+    clamp(min, max) {
+      return new Angle(Math.max(min.radians, Math.min(max.radians, this.radians)));
+    }
+  }
+
+  const TAU = new Angle(2.0 * Math.PI);
+  const HALF_TAU = TAU.div(2); // 180 degrees
+  const MAX_RADAR_ARC = TAU.div(4); // 90 degrees
+  const MAX_BODY_TURN = Angle.fromDegrees(1.5); // Maximum degrees tank body can turn per iteration
+  const MAX_GUN_TURN = Angle.fromDegrees(3.0); // Maximum degrees gun can turn per iteration
   const MAX_MISSILE_ENERGY = 50; // Maximum energy a missile can have
   const MISSILE_ENERGY_MULTIPLIER = 0.2; // Multiplier for missile energy
-  const MAX_BODY_TURN_DEGREES = 1.5; // Maximum degrees tank body can turn per iteration
-  const MAX_GUN_TURN_DEGREES = 3; // Maximum degrees gun can turn per iteration
   const MISSILE_SPEED = 4; // Speed of missiles
   const MAX_ACTUAL_SPEED = 2; // Maximum actual speed of tank
-  const MAX_POWERUP_AMOUNT = 100; // Maximum amount for powerups
+  const MAX_POWERUP_AMOUNT = 100; // Maximum amount for power-ups
   const POWERUP_PICKUP_DURATION = 300; // Duration for powerup pickup
   const MAX_GUN_HEAT = 30; // Maximum gun heat
   const MAX_TANK_ENERGY = 1000; // Maximum tank energy
@@ -30,34 +60,28 @@ function main(tank, arena) {
   const MAX_DISTANCE = Math.sqrt(arena.width * arena.width + arena.height * arena.height) / 2;
   const saved = tank.retained;
 
-  // Helper functions
-  tank.angleDifference = (a1, a2) => {
-    a1 = (a1 + ANGLE_NORMALIZATION) % FULL_ANGLE_DEGREES;
-    a2 = (a2 + ANGLE_NORMALIZATION) % FULL_ANGLE_DEGREES;
-    if (a1 > HALF_ANGLE_DEGREES) a1 -= FULL_ANGLE_DEGREES;
-    if (a2 > HALF_ANGLE_DEGREES) a2 -= FULL_ANGLE_DEGREES;
-    return (a2 - a1 + HALF_ANGLE_DEGREES) % FULL_ANGLE_DEGREES - HALF_ANGLE_DEGREES;
-  };
-
   tank.calculateGunTurn = (x, y) => {
-    const targetAngle = tank.angleTo(x, y);
-    let gunAngleDifference = tank.angleDifference(tank.bodyAim + tank.gunAim, targetAngle);
-    return Math.max(-1, Math.min(1, gunAngleDifference / 10));
+    const targetAngle = Angle.fromDegrees(tank.angleTo(x, y));
+    let gunAngleDifference = Angle.fromDegrees(tank.bodyAim + tank.gunAim).difference(targetAngle);
+    return gunAngleDifference.div(10.0).clamp(Angle.fromDegrees(-1.0), Angle.fromDegrees(1.0))
   };
 
-  tank.perpendicularSpeedComponent = (target) => {
-    let angleDifference = (target.angleTo - target.bodyAim + ANGLE_NORMALIZATION) % FULL_ANGLE_DEGREES;
-    return Math.sin(angleDifference * DEGREES);
+  const perpendicularSpeedComponent = (target) => {
+    const targetAngle = Angle.fromDegrees(target.angleTo);
+    const bodyAngle = Angle.fromDegrees(target.bodyAim);
+    const angleDifference = bodyAngle.difference(targetAngle);
+    return Math.sin(angleDifference.radians);
   };
 
   tank.getTargetPriority = (target) => {
+    const bodyGunAngle = Angle.fromDegrees(tank.bodyAim + tank.gunAim);
+    const targetAngle = Angle.fromDegrees(target.angleTo);
+    const angleDiff = bodyGunAngle.difference(targetAngle);
     const accuracyFactor = (
       1
-      - Math.abs(
-        tank.angleDifference(tank.bodyAim + tank.gunAim, target.angleTo)
-      ) / (tank.radarArc * MAX_RADAR_ARC_DEGREES)
+      - Math.abs(angleDiff.degrees) / (tank.radarArc * MAX_RADAR_ARC.degrees)
     ) ** 2;
-    const trajectoryFactor = (1 - Math.abs(tank.perpendicularSpeedComponent(target)));
+    const trajectoryFactor = (1 - Math.abs(perpendicularSpeedComponent(target)));
     const distanceFactor = (1 - target.distance / MAX_DISTANCE) ** 2;
     const energyFactor = (1 - target.energy / (saved.maxTargetEnergy || 1000));
     const speedFactor = 1 - Math.abs(target.speed);
@@ -71,11 +95,10 @@ function main(tank, arena) {
 
   // Improved missile threat assessment
   tank.getMissilePriority = (missile) => {
-    const perfectTrajectory = (
-      Math.atan2(tank.y - missile.y, tank.x - missile.x) * DEGREES + ANGLE_NORMALIZATION
-    ) % FULL_ANGLE_DEGREES;
-    const trajectoryDifference = tank.angleDifference(perfectTrajectory, missile.aim);
-    const trajectoryFactor = (1 - Math.abs(trajectoryDifference) / HALF_ANGLE_DEGREES);
+    const perfectTrajectory = Angle.fromDegrees(tank.angleFrom(missile.x, missile.y));
+    const missileAim = Angle.fromDegrees(missile.aim);
+    const trajectoryDifference = perfectTrajectory.difference(missileAim);
+    const trajectoryFactor = (1 - Math.abs(trajectoryDifference.degrees) / HALF_TAU.degrees);
     const distanceFactor = 1 - (missile.distance / MAX_DISTANCE);
     const energyFactor = 1 - (missile.energy / MAX_MISSILE_ENERGY);
 
@@ -115,13 +138,14 @@ function main(tank, arena) {
     let predictedTankX = tank.x;
     let predictedTankY = tank.y;
     let currentTankSpeed = tank.actualSpeed;
-    let predictedBodyAim = tank.bodyAim;
+    let predictedBodyAim = Angle.fromDegrees(tank.bodyAim);
+    const missileAim = Angle.fromDegrees(missile.aim);
 
     for (let i = 0; i < PREDICTION_STEPS; i++) {
-      predictedMissileX += MISSILE_SPEED * Math.cos(missile.aim * DEGREES);
-      predictedMissileY += MISSILE_SPEED * Math.sin(missile.aim * DEGREES);
-      predictedTankX += currentTankSpeed * Math.cos(predictedBodyAim * DEGREES);
-      predictedTankY += currentTankSpeed * Math.sin(predictedBodyAim * DEGREES);
+      predictedMissileX += MISSILE_SPEED * Math.cos(missileAim.radians);
+      predictedMissileY += MISSILE_SPEED * Math.sin(missileAim.radians);
+      predictedTankX += currentTankSpeed * Math.cos(predictedBodyAim.radians);
+      predictedTankY += currentTankSpeed * Math.sin(predictedBodyAim.radians);
       const distance = Math.sqrt((predictedMissileX - predictedTankX) ** 2 + (predictedMissileY - predictedTankY) ** 2);
       if (distance < COLLISION_BUFFER) {
         return true;
@@ -165,25 +189,26 @@ function main(tank, arena) {
 
   // Determine if tank is near wall
   const wallProximityThreshold = saved.wallAvoidance.threshold * tank.size;
-  const nextX = tank.x + tank.actualSpeed * Math.cos(tank.bodyAim * DEGREES);
-  const nextY = tank.y + tank.actualSpeed * Math.sin(tank.bodyAim * DEGREES);
+  const bodyAngle = Angle.fromDegrees(tank.bodyAim);
+  const nextX = tank.x + tank.actualSpeed * Math.cos(bodyAngle.radians);
+  const nextY = tank.y + tank.actualSpeed * Math.sin(bodyAngle.radians);
   tank.isNearWall = (
     Math.abs(nextX) > arena.width / 2 - wallProximityThreshold ||
     Math.abs(nextY) > arena.height / 2 - wallProximityThreshold
   );
 
   // Calculate number of frames until wall collision
-  let predictedAim = tank.bodyAim + tank.bodyTurn * MAX_BODY_TURN_DEGREES;
-  let predictedX = tank.x + tank.actualSpeed * Math.cos(predictedAim * DEGREES);
-  let predictedY = tank.y + tank.actualSpeed * Math.sin(predictedAim * DEGREES);
+  let predictedAim = Angle.fromDegrees(tank.bodyAim + tank.bodyTurn * MAX_BODY_TURN.degrees);
+  let predictedX = tank.x + tank.actualSpeed * Math.cos(predictedAim.radians);
+  let predictedY = tank.y + tank.actualSpeed * Math.sin(predictedAim.radians);
   let collision = (
     Math.abs(predictedX) > arena.width / 2 - tank.size || Math.abs(predictedY) > arena.height / 2 - tank.size
   );
   let framesUntilWallCollision = 0;
   while (framesUntilWallCollision < 100 && !collision) {
-    predictedAim += tank.bodyTurn * MAX_BODY_TURN_DEGREES;
-    predictedX += tank.actualSpeed * Math.cos(predictedAim * DEGREES);
-    predictedY += tank.actualSpeed * Math.sin(predictedAim * DEGREES);
+    predictedAim = Angle.fromDegrees(predictedAim.degrees + tank.bodyTurn * MAX_BODY_TURN.degrees);
+    predictedX += tank.actualSpeed * Math.cos(predictedAim.radians);
+    predictedY += tank.actualSpeed * Math.sin(predictedAim.radians);
     collision = (
       Math.abs(predictedX) > arena.width / 2 - tank.size || Math.abs(predictedY) > arena.height / 2 - tank.size
     );
@@ -201,7 +226,7 @@ function main(tank, arena) {
   // Determine the nearest wall and the angle to it
   if (leftWallDistance < wallDistance) {
     wallDistance = leftWallDistance;
-    wallAngle = HALF_ANGLE_DEGREES;
+    wallAngle = HALF_TAU.degrees;
   }
   if (rightWallDistance < wallDistance) {
     wallDistance = rightWallDistance;
@@ -209,11 +234,11 @@ function main(tank, arena) {
   }
   if (topWallDistance < wallDistance) {
     wallDistance = topWallDistance;
-    wallAngle = -HALF_ANGLE_DEGREES / 2;
+    wallAngle = -HALF_TAU.degrees / 2;
   }
   if (bottomWallDistance < wallDistance) {
     wallDistance = bottomWallDistance;
-    wallAngle = HALF_ANGLE_DEGREES / 2;
+    wallAngle = HALF_TAU.degrees / 2;
   }
 
   // Update fired missile information
@@ -344,8 +369,9 @@ function main(tank, arena) {
       avgVelocityY /= Math.max(1, totalDeltaTime);
     }
     else {
-      avgVelocityX = target.actualSpeed * Math.cos(target.bodyAim * DEGREES);
-      avgVelocityY = target.actualSpeed * Math.sin(target.bodyAim * DEGREES);
+      const targetBodyAngle = Angle.fromDegrees(target.bodyAim);
+      avgVelocityX = target.actualSpeed * Math.cos(targetBodyAngle.radians);
+      avgVelocityY = target.actualSpeed * Math.sin(targetBodyAngle.radians);
     }
 
     // Calculate missile intercept time
@@ -372,17 +398,18 @@ function main(tank, arena) {
     const MAX_AIM_ACCURACY = 4.8;
     const DISTANCE_EXPONENT = 1.8;
     const aimAccuracyThreshold = Math.min(
-      MAX_AIM_ACCURACY, Math.atan2(MAX_ACTUAL_SPEED * timeToIntercept, target.distance) * DEGREES
+      MAX_AIM_ACCURACY, Math.atan2(MAX_ACTUAL_SPEED * timeToIntercept, target.distance) * 180 / Math.PI
     );
-    const predictedTargetAngle = tank.angleTo(predictedTargetX, predictedTargetY);
-    const gunAngleDifference = tank.angleDifference(tank.bodyAim + tank.gunAim, predictedTargetAngle);
-    const aimError = Math.abs(gunAngleDifference);
+    const predictedTargetAngle = Angle.fromDegrees(tank.angleTo(predictedTargetX, predictedTargetY));
+    const bodyGunAngle = Angle.fromDegrees(tank.bodyAim + tank.gunAim);
+    const gunAngleDifference = bodyGunAngle.difference(predictedTargetAngle);
+    const aimError = Math.abs(gunAngleDifference.degrees);
     const aimErrorThreshold = aimAccuracyThreshold * (1 - (target.distance / arena.width) ** DISTANCE_EXPONENT);
-    const perpendicularSpeedComponent = Math.abs(tank.perpendicularSpeedComponent(target));
+    const perpendicularSpeedComponent_ = Math.abs(perpendicularSpeedComponent(target));
     const historicAccuracy = tank.aimAccuracy || 0.5;
     const probabilityOfHit = (1 - aimError / aimErrorThreshold) * (
       (1 - target.distance / MAX_DISTANCE) *
-      (1 - perpendicularSpeedComponent)
+      (1 - perpendicularSpeedComponent_)
     );
 
     if (aimError < aimErrorThreshold) {
@@ -420,14 +447,14 @@ function main(tank, arena) {
         let aimAtY = saved?.target?.y || 0;
         const desiredGunTurn = tank.calculateGunTurn(aimAtX, aimAtY);
         const randomDirection = 1 - Math.round(Math.random() * 2);
-        saved.scanDirection = Math.sign(desiredGunTurn) || randomDirection;
+        saved.scanDirection = Math.sign(desiredGunTurn.radians) || randomDirection;
       }
 
       // Calculate scan speed and turn gun (radar will follow gun)
       const rotationAmount = saved.scanDirection * saved.scanSpeed;
       tank.gunTurn = saved.scanDirection * saved.scanSpeed;
-      saved.scanRotation += Math.abs(rotationAmount * MAX_GUN_TURN_DEGREES);
-      const fullRotations = ~~(saved.scanRotation / FULL_ANGLE_DEGREES);
+      saved.scanRotation += Math.abs(rotationAmount * MAX_GUN_TURN.degrees);
+      const fullRotations = ~~(saved.scanRotation / TAU.degrees);
       const slowDownRate = Math.min(4, fullRotations) / 4;
       saved.scanSpeed = 1 - 0.45 * slowDownRate;
       if (fullRotations === 5) {
@@ -440,8 +467,10 @@ function main(tank, arena) {
   // Wall avoidance logic
   if (tank.isNearWall) {
     // Slow down for better handling
-    const wallOffset = Math.abs(tank.angleDifference(tank.bodyAim, wallAngle));
-    const directionFactor = 1 - (wallOffset / (HALF_ANGLE_DEGREES / 2));
+    const bodyAngle = Angle.fromDegrees(tank.bodyAim);
+    const wallAngleObj = Angle.fromDegrees(wallAngle);
+    const wallOffset = Math.abs(bodyAngle.difference(wallAngleObj).degrees);
+    const directionFactor = 1 - (wallOffset / (HALF_TAU.degrees / 2));
     const distanceFactor = wallDistance / wallProximityThreshold;
     const slowDownFactor = saved.wallAvoidance.slowDown * directionFactor;
     tank.speed = (1 - slowDownFactor) + (slowDownFactor * distanceFactor);
@@ -457,12 +486,12 @@ function main(tank, arena) {
     }
 
     // Turn away from the wall
-    const angleToCenter = tank.angleTo(0, 0);
-    let bodyAngleDifference = tank.angleDifference(tank.bodyAim, angleToCenter);
-    tank.bodyTurn = bodyAngleDifference / HALF_ANGLE_DEGREES;
+    const angleToCenter = Angle.fromDegrees(tank.angleTo(0, 0));
+    const bodyAngleDiff = bodyAngle.difference(angleToCenter);
+    tank.bodyTurn = bodyAngleDiff.degrees / HALF_TAU.degrees;
 
     // Always take the shortest turn path
-    if (Math.abs(bodyAngleDifference) > HALF_ANGLE_DEGREES) {
+    if (Math.abs(bodyAngleDiff.degrees) > HALF_TAU.degrees) {
       tank.speed *= -1;
       tank.bodyTurn *= -1;
     }
@@ -472,9 +501,10 @@ function main(tank, arena) {
     // Handle detected missiles
     if (tank.detectedMissiles.length > 0) {
       saved.incomingMissiles = tank.detectedMissiles.filter((missile) => {
-        const perfectTrajectory = tank.angleFrom(missile.x, missile.y);
-        const trajectoryDifference = tank.angleDifference(perfectTrajectory, missile.aim);
-        const aimError = Math.abs(trajectoryDifference);
+        const perfectTrajectory = Angle.fromDegrees(tank.angleFrom(missile.x, missile.y));
+        const missileAim = Angle.fromDegrees(missile.aim);
+        const trajectoryDifference = perfectTrajectory.difference(missileAim);
+        const aimError = Math.abs(trajectoryDifference.degrees);
         const interceptionAimThreshold = (
           INTERCEPTION_BASE_THRESHOLD + INTERCEPTION_DISTANCE_FACTOR * missile.distance / MAX_DISTANCE
         );
@@ -485,9 +515,10 @@ function main(tank, arena) {
         (a, b) => tank.getMissilePriority(b) - tank.getMissilePriority(a)
       );
       const missile = tank.detectedMissiles[0];
-      const perfectTrajectory = tank.angleFrom(missile.x, missile.y);
-      const trajectoryDifference = tank.angleDifference(perfectTrajectory, missile.aim);
-      const aimError = Math.abs(trajectoryDifference);
+      const perfectTrajectory = Angle.fromDegrees(tank.angleFrom(missile.x, missile.y));
+      const missileAim = Angle.fromDegrees(missile.aim);
+      const trajectoryDifference = perfectTrajectory.difference(missileAim);
+      const aimError = Math.abs(trajectoryDifference.degrees);
       const interceptionAimThreshold = (
         INTERCEPTION_BASE_THRESHOLD + INTERCEPTION_DISTANCE_FACTOR * missile.distance / MAX_DISTANCE
       );
@@ -499,13 +530,15 @@ function main(tank, arena) {
       if (saved.willBeHitByMissile || aimError < interceptionAimThreshold && !evasionExceptions) {
         saved.missileEvasion = COLLISION_COOLDOWN_TIME;
 
-        const EVASION_ANGLE_OFFSET = HALF_ANGLE_DEGREES / 2 - 5; // 85 degrees
+        const EVASION_ANGLE_OFFSET = Angle.fromDegrees(85); // 85 degrees
         const EVASION_TURN_DIVISOR = 9;
-        tank.bodyTurn = (
-          tank.angleDifference(tank.bodyAim, saved.threatAngle + EVASION_ANGLE_OFFSET) / EVASION_TURN_DIVISOR
-        );
+        const bodyAngle = Angle.fromDegrees(tank.bodyAim);
+        const threatAngle = Angle.fromDegrees(saved.threatAngle);
+        const offsetAngle = Angle.fromDegrees(threatAngle.degrees + EVASION_ANGLE_OFFSET.degrees);
+        const turnAngle = bodyAngle.difference(offsetAngle);
+        tank.bodyTurn = turnAngle.degrees / EVASION_TURN_DIVISOR;
         tank.speed = 1;
-        if (trajectoryDifference < 0) {
+        if (trajectoryDifference.radians < 0) {
           tank.speed *= -1;
           saved.missileEvasionReverse = ~~(missile.distance / missile.speed);
         }
@@ -533,7 +566,7 @@ function main(tank, arena) {
       saved.willBeHitByMissile = false;
       saved.missileEvasion = 0;
       saved.missileEvasionReverse = 0;
-      if (!saved.isUnderRapidFire && saved.target?.gunHeat > 1) {
+      if (saved.target?.gunHeat > 1) {
         tank.conserveEnergy = true;
       }
       else {
@@ -546,8 +579,9 @@ function main(tank, arena) {
     saved.missileThreat = 0;
     if (saved.incomingMissiles) {
       saved.incomingMissiles = saved.incomingMissiles.filter((missile) => {
-        missile.x += MISSILE_SPEED * Math.cos(missile.aim * DEGREES);
-        missile.y += MISSILE_SPEED * Math.sin(missile.aim * DEGREES);
+        const missileAim = Angle.fromDegrees(missile.aim);
+        missile.x += MISSILE_SPEED * Math.cos(missileAim.radians);
+        missile.y += MISSILE_SPEED * Math.sin(missileAim.radians);
         missile.energy -= MISSILE_SPEED;
         if (missile.energy <= 0) {
           missile.energy = 1 / Number.MAX_SAFE_INTEGER;
@@ -571,16 +605,21 @@ function main(tank, arena) {
     }
     const collisionIsBiggestThreat = saved.collisionDamage > saved.missileThreat;
     if (saved.collisionCoolDown && collisionIsBiggestThreat && arena.tanksRemaining > 2) {
-      const desiredGunTurn = tank.angleDifference(tank.bodyAim + tank.gunAim, saved.collisionAngle);
-      tank.gunTurn = desiredGunTurn / 10;
+      const bodyGunAngle = Angle.fromDegrees(tank.bodyAim + tank.gunAim);
+      const collisionAngle = Angle.fromDegrees(saved.collisionAngle);
+      const desiredGunTurn = bodyGunAngle.difference(collisionAngle);
+      tank.gunTurn = desiredGunTurn.degrees / 10;
     }
     if (tank.isNearWall && saved.collisionCoolDown && !saved.underRapidFire) {
-      const COLLISION_ANGLE_OFFSET = HALF_ANGLE_DEGREES / 2; // 90 degrees
+      const COLLISION_ANGLE_OFFSET = Angle.fromDegrees(90); // 90 degrees
       const COLLISION_TURN_DIVISOR = 10;
-      const directionDifference = tank.angleDifference(tank.bodyAim, saved.collisionAngle + COLLISION_ANGLE_OFFSET);
-      tank.bodyTurn = directionDifference / COLLISION_TURN_DIVISOR;
+      const bodyAngle = Angle.fromDegrees(tank.bodyAim);
+      const collisionAngle = Angle.fromDegrees(saved.collisionAngle);
+      const offsetAngle = Angle.fromDegrees(collisionAngle.degrees + COLLISION_ANGLE_OFFSET.degrees);
+      const directionDifference = bodyAngle.difference(offsetAngle);
+      tank.bodyTurn = directionDifference.degrees / COLLISION_TURN_DIVISOR;
       tank.speed = (saved.collisionCoolDown || 1) / COLLISION_COOLDOWN_TIME;
-      if (Math.abs(saved.collisionAngle) > (HALF_ANGLE_DEGREES / 2)) {
+      if (Math.abs(collisionAngle.degrees) > (HALF_TAU.degrees / 2)) {
         tank.bodyTurn *= -tank.bodyTurn;
         tank.speed *= -1;
       }
@@ -588,9 +627,12 @@ function main(tank, arena) {
 
     // Orient tanks body perpendicular to target for missile evasion
     if (saved.target && !tank.isNearWall) {
-      const EVASION_PERPENDICULAR_OFFSET = 88; // Almost perpendicular for better evasion
-      const angleDifference = tank.angleDifference(tank.bodyAim, saved.target.angleTo + EVASION_PERPENDICULAR_OFFSET);
-      tank.bodyTurn = angleDifference / HALF_ANGLE_DEGREES;
+      const EVASION_PERPENDICULAR_OFFSET = Angle.fromDegrees(88); // Almost perpendicular for better evasion
+      const bodyAngle = Angle.fromDegrees(tank.bodyAim);
+      const targetAngle = Angle.fromDegrees(saved.target.angleTo);
+      const offsetAngle = Angle.fromDegrees(targetAngle.degrees + EVASION_PERPENDICULAR_OFFSET.degrees);
+      const angleDifference = bodyAngle.difference(offsetAngle);
+      tank.bodyTurn = angleDifference.degrees / HALF_TAU.degrees;
     }
   }
 
@@ -614,13 +656,13 @@ function main(tank, arena) {
     saved.powerup.safety = 1;
   }
   if (saved.powerup && saved.target) {
-    const targetAngle = tank.angleTo(saved.target.x, saved.target.y);
-    const powerupAngle = tank.angleTo(saved.powerup.x, saved.powerup.y);
-    let angleOffset = Math.abs(tank.angleDifference(targetAngle, powerupAngle));
-    if (angleOffset > (HALF_ANGLE_DEGREES / 2)) {
-      angleOffset = (HALF_ANGLE_DEGREES / 2) - (angleOffset - (HALF_ANGLE_DEGREES / 2));
+    const targetAngle = Angle.fromDegrees(tank.angleTo(saved.target.x, saved.target.y));
+    const powerupAngle = Angle.fromDegrees(tank.angleTo(saved.powerup.x, saved.powerup.y));
+    let angleOffset = Math.abs(targetAngle.difference(powerupAngle).degrees);
+    if (angleOffset > (HALF_TAU.degrees / 2)) {
+      angleOffset = (HALF_TAU.degrees / 2) - (angleOffset - (HALF_TAU.degrees / 2));
     }
-    let trajectoryFactor = 1 - angleOffset / (HALF_ANGLE_DEGREES / 2);
+    let trajectoryFactor = 1 - angleOffset / (HALF_TAU.degrees / 2);
     let gunHeatFactor = 1 - saved.target.gunHeat / MAX_GUN_HEAT;
     const distanceFactor = (1 - tank.distanceTo(saved.powerup.x, saved.powerup.y) / MAX_DISTANCE) ** 2;
     const targetDistanceFactor = tank.distanceTo(saved.target.x, saved.target.y) / MAX_DISTANCE;
@@ -652,8 +694,7 @@ function main(tank, arena) {
     saved.powerup.exceptions = (
       (saved.willBeHitByMissile) ||
       (saved.missileEvasion) ||
-      (saved.collisionCooldown) ||
-      (saved.powerup?.saftey < saved.powerup.safetyThreshold) ||
+      (saved.powerup?.safety < saved.powerup.safetyThreshold) ||
       (tank.isNearWall || saved.powerup?.isNearWall)
     );
   }
@@ -663,12 +704,13 @@ function main(tank, arena) {
   if (saved.powerup && !saved.powerup.exceptions) {
     saved.isSeekingPowerup = true;
     const distance = tank.distanceTo(saved.powerup.x, saved.powerup.y);
-    const angle = tank.angleTo(saved.powerup.x, saved.powerup.y);
-    const directionDifference = tank.angleDifference(tank.bodyAim, angle);
+    const angle = Angle.fromDegrees(tank.angleTo(saved.powerup.x, saved.powerup.y));
+    const bodyAngle = Angle.fromDegrees(tank.bodyAim);
+    const directionDifference = bodyAngle.difference(angle);
     const POWERUP_TURN_DIVISOR = 10;
-    tank.bodyTurn = directionDifference / POWERUP_TURN_DIVISOR;
+    tank.bodyTurn = directionDifference.degrees / POWERUP_TURN_DIVISOR;
     tank.speed = (distance > tank.size * 2) ? 1 : distance / MAX_DISTANCE;
-    if (directionDifference > HALF_ANGLE_DEGREES) {
+    if (Math.abs(directionDifference.degrees) > HALF_TAU.degrees) {
       tank.bodyTurn *= -1;
       tank.speed *= -1;
     }
