@@ -25,16 +25,53 @@ Math.cos = (angle) => {
     return COS_LOOKUP[index];
 };
 
+class Angle {
+    constructor(radians) {
+        this._radians = radians;
+    }
 
-const ATAN2_TABLE_SIZE = SIN_TABLE_SIZE;
-const ATAN2_LOOKUP = new Array(ATAN2_TABLE_SIZE);
-for (let i = 0; i < ATAN2_TABLE_SIZE; i++) {
-    const angle = (i / ATAN2_TABLE_SIZE) * 2 * Math.PI;
-    ATAN2_LOOKUP[i] = Math.cos(angle);
+    static fromDegrees(degrees) {
+        return new Angle(degrees * Math.PI / 180.0)
+    }
+
+    get degrees() {
+        return this._radians * 180.0 / Math.PI;
+    }
+
+    get radians() {
+        return this._radians;
+    }
+
+    div(scalar) {
+        return new Angle(this.radians / scalar);
+    }
+
+    difference(other) {
+        const normalization = Math.PI * 2000;
+        let a1 = (this._radians + normalization) % (2.0 * Math.PI);
+        let a2 = (other._radians + normalization) % (2.0 * Math.PI);
+        if (a1 > Math.PI) a1 -= (2.0 * Math.PI);
+        if (a2 > Math.PI) a2 -= (2.0 * Math.PI);
+        return new Angle((a2 - a1 + Math.PI) % (2.0 * Math.PI) - Math.PI);
+    }
+
+    clamp(min, max) {
+        return new Angle(Math.max(min.radians, Math.min(max.radians, this.radians)));
+    }
 }
-Math.ATAN2 = (angle) => {
-    let normalizedAngle = angle % (2 * Math.PI);
-    if (normalizedAngle < 0) normalizedAngle += 2 * Math.PI;
-    const index = Math.round((normalizedAngle / (2 * Math.PI)) * (ATAN2_TABLE_SIZE - 1));
-    return ATAN2_LOOKUP[index];
-};
+
+class Vector2 {
+    constructor(x, y) {
+        this._x = x;
+        this._y = y;
+    }
+
+    polarOffset(speed, angle) {
+        return new Vector2(this._x + speed * Math.cos(angle.radians), this._y + speed * Math.sin(angle.radians))
+    }
+
+    distanceTo(other) {
+        return Math.sqrt((this._x - other._x) ** 2 + (this._y - other._y) ** 2)
+    }
+}
+

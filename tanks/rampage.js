@@ -3,7 +3,7 @@ function main(tank, arena) {
     const COLLISION_COOLDOWN_TIME = 36;
     const LOW_ENERGY_THRESHOLD = 100;
     const saved = tank.retained;
-
+    
     tank.angleDifference = (a1, a2) => {
         a1 = (a1 + 360000) % 360;
         a2 = (a2 + 360000) % 360;
@@ -179,7 +179,6 @@ function main(tank, arena) {
         wallAngle = 90;
     }
 
-
     // Update fired missile information
     if (saved.lastMissileId) {
         const missile = tank.missiles[saved.lastMissileId];
@@ -225,6 +224,7 @@ function main(tank, arena) {
     }
 
     // Low energy mode
+    tank.energyLow = false;
     if (tank.energy < LOW_ENERGY_THRESHOLD) {
         tank.energyLow = true;
         let energyFactor =  tank.energy / LOW_ENERGY_THRESHOLD;
@@ -234,10 +234,7 @@ function main(tank, arena) {
             tank.speed = desiredSpeed;
         }
     }
-    else {
-        tank.energyLow = false;
-    }
-    
+
     // Wander around the arena (default action)
     const wanderSeed = 0.3 + Math.random() * 0.4;
     saved.wanderPatterns = [
@@ -344,18 +341,21 @@ function main(tank, arena) {
         const historicAccuracy = tank.aimAccuracy || 0.5;
         const probabilityOfHit = (1 - aimError / aimErrorThreshold) * (
             (1 - target.distance / MAX_DISTANCE) *
-            (1 - perpendicularSpeedComponent)
+            (1 - perpendicularSpeedComponent) ** 2
         );
-        if (aimError < aimErrorThreshold) {
+        if (aimError < aimErrorThreshold && probabilityOfHit >= 0.5) {
             const minFirePower = 5;
             const accuracyBonus = MAX_MISSILE_ENERGY * historicAccuracy ** (1 / 2) * probabilityOfHit ** 2;
-            let firePower = (tank.energyLow) ? minFirePower : Math.min(50, minFirePower + accuracyBonus);
+            let firePower = (tank.energyLow) ? minFirePower : Math.min(MAX_MISSILE_ENERGY, minFirePower + accuracyBonus);
             firePower *= 4 - (target.distance / MAX_DISTANCE) * 3;
+            if (firePower > MAX_MISSILE_ENERGY) {
+                firePower = MAX_MISSILE_ENERGY;
+            }
             const weaponUpgrades = [ "guncool", "firepower" ];
             if (weaponUpgrades.includes(tank.powerup.type) || Math.random() > 0.9) {
                 firePower = Math.max(firePower, MAX_MISSILE_ENERGY * probabilityOfHit);
             }
-            if (probabilityOfHit > 0.9) {
+            if (probabilityOfHit > 0.75) {
                 firePower = MAX_MISSILE_ENERGY;
             }
             const missileEnergy = firePower * MISSILE_ENERGY_MULTIPLIER;

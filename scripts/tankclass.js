@@ -218,6 +218,42 @@ class Tank {
             sound: enableSound.checked,
             missileInterception: arena.missileInterception,
             powerupsSpawned: arena.powerupsSpawned,
+            contains: (x, y, margin = 0) => {
+                return Math.abs(x) < arena.width / 2 - margin && Math.abs(y) < arena.height / 2 - margin;
+            },
+            nearestWallDistance: (x, y) => {
+                const leftWallDistance = Math.abs(-arena.width / 2 - x);
+                const rightWallDistance = Math.abs(arena.width / 2 - x);
+                const topWallDistance = Math.abs(-arena.height / 2 - y);
+                const bottomWallDistance = Math.abs(arena.height / 2 - y);
+                return Math.min(leftWallDistance, rightWallDistance, topWallDistance, bottomWallDistance);
+            },
+            nearestWallAngle: (x, y) => {
+                const leftWallDistance = Math.abs(-arena.width / 2 - x);
+                const rightWallDistance = Math.abs(arena.width / 2 - x);
+                const topWallDistance = Math.abs(-arena.height / 2 - y);
+                const bottomWallDistance = Math.abs(arena.height / 2 - y);
+                let wallDistance = Infinity;
+                let wallAngle = 0;
+                if (leftWallDistance < wallDistance) {
+                    wallDistance = leftWallDistance;
+                    wallAngle = 180;
+                }
+                if (rightWallDistance < wallDistance) {
+                    wallDistance = rightWallDistance;
+                    wallAngle = 0;
+                }
+                if (topWallDistance < wallDistance) {
+                    wallDistance = topWallDistance;
+                    wallAngle = -90;
+                }
+                if (bottomWallDistance < wallDistance) {
+                    wallDistance = bottomWallDistance;
+                    wallAngle = 90;
+                }
+                return wallAngle;
+            }
+
         }
 
         try {

@@ -196,6 +196,14 @@ the challenge. For fair play, limit your code's interaction exclusively to the p
 | `tank.fire(energy)`              | Number    | Fires a missile with the specified `energy`. The missile energy is limited `MAX_MISSILE_ENERGY`. Can not fire if `tank.gunHeat > 0` Returns `id` of fired missile (used as a key for `tank.missiles`).
 
 
+## Arena Methods
+
+| Method Name                      | Returns   | Description
+| -------------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+| `nearestWallAngle(x, y)`         | Number    | Returns the angle to the nearest wall (degrees, absolute)
+| `nearestWallDistance(x, y)`      | Number    | Returns the distance to the nearest wall
+| `contains(x, y, margin = 0)`     | Boolean   | `true` if the specified point is within the margins of the arena, `false` otherwise.
+
 
 ## Powerups
 
