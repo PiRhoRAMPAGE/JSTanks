@@ -1,52 +1,52 @@
 function main(tank, arena) {
-class ArenaBounds {
-    constructor(width, height) {
-        this._halfWidth = width / 2;
-        this._halfHeight = height / 2;
-    }
-
-    contains(position, margin = 0) {
-        return Math.abs(position._x) < this._halfWidth - margin &&
-            Math.abs(position._y) < this._halfHeight - margin;
-    }
-
-    distanceToWall(position) {
-        const leftWallDistance = Math.abs(-this._halfWidth - position._x);
-        const rightWallDistance = Math.abs(this._halfWidth - position._x);
-        const topWallDistance = Math.abs(-this._halfHeight - position._y);
-        const bottomWallDistance = Math.abs(this._halfHeight - position._y);
-        return Math.min(leftWallDistance, rightWallDistance, topWallDistance, bottomWallDistance);
-    }
-
-    nearestWallAngle(position) {
-        const leftWallDistance = Math.abs(-this._halfWidth - position._x);
-        const rightWallDistance = Math.abs(this._halfWidth - position._x);
-        const topWallDistance = Math.abs(-this._halfHeight - position._y);
-        const bottomWallDistance = Math.abs(this._halfHeight - position._y);
-
-        let wallDistance = Infinity;
-        let wallAngle = 0;
-
-        if (leftWallDistance < wallDistance) {
-            wallDistance = leftWallDistance;
-            wallAngle = Math.PI; // 180 degrees
-        }
-        if (rightWallDistance < wallDistance) {
-            wallDistance = rightWallDistance;
-            wallAngle = 0; // 0 degrees
-        }
-        if (topWallDistance < wallDistance) {
-            wallDistance = topWallDistance;
-            wallAngle = -Math.PI / 2; // -90 degrees
-        }
-        if (bottomWallDistance < wallDistance) {
-            wallDistance = bottomWallDistance;
-            wallAngle = Math.PI / 2; // 90 degrees
-        }
-
-        return new Angle(wallAngle);
-    }
-}
+  class ArenaBounds {
+      constructor(width, height) {
+          this._halfWidth = width / 2;
+          this._halfHeight = height / 2;
+      }
+  
+      contains(position, margin = 0) {
+          return Math.abs(position._x) < this._halfWidth - margin &&
+              Math.abs(position._y) < this._halfHeight - margin;
+      }
+  
+      distanceToWall(position) {
+          const leftWallDistance = Math.abs(-this._halfWidth - position._x);
+          const rightWallDistance = Math.abs(this._halfWidth - position._x);
+          const topWallDistance = Math.abs(-this._halfHeight - position._y);
+          const bottomWallDistance = Math.abs(this._halfHeight - position._y);
+          return Math.min(leftWallDistance, rightWallDistance, topWallDistance, bottomWallDistance);
+      }
+  
+      nearestWallAngle(position) {
+          const leftWallDistance = Math.abs(-this._halfWidth - position._x);
+          const rightWallDistance = Math.abs(this._halfWidth - position._x);
+          const topWallDistance = Math.abs(-this._halfHeight - position._y);
+          const bottomWallDistance = Math.abs(this._halfHeight - position._y);
+  
+          let wallDistance = Infinity;
+          let wallAngle = 0;
+  
+          if (leftWallDistance < wallDistance) {
+              wallDistance = leftWallDistance;
+              wallAngle = Math.PI; // 180 degrees
+          }
+          if (rightWallDistance < wallDistance) {
+              wallDistance = rightWallDistance;
+              wallAngle = 0; // 0 degrees
+          }
+          if (topWallDistance < wallDistance) {
+              wallDistance = topWallDistance;
+              wallAngle = -Math.PI / 2; // -90 degrees
+          }
+          if (bottomWallDistance < wallDistance) {
+              wallDistance = bottomWallDistance;
+              wallAngle = Math.PI / 2; // 90 degrees
+          }
+  
+          return new Angle(wallAngle);
+      }
+  }
     
   const TAU = new Angle(2.0 * Math.PI);
   const HALF_TAU = TAU.div(2);
@@ -394,24 +394,19 @@ class ArenaBounds {
       const accuracyBonus = MAX_MISSILE_ENERGY * historicAccuracy ** (1 / 2) * probabilityOfHit ** 2;
       let firePower = (tank.energyLow) ? MIN_FIRE_POWER : Math.min(MAX_MISSILE_ENERGY, MIN_FIRE_POWER + accuracyBonus);
       firePower *= 4 - (target.distance / MAX_DISTANCE) * DISTANCE_MULTIPLIER;
-      console.log(firePower);
       const weaponUpgrades = ["guncool", "firepower"];
       if (weaponUpgrades.includes(tank.powerup?.type) || Math.random() > AGGRESSIVE_FIRE_THRESHOLD) {
         firePower = Math.max(firePower, MAX_MISSILE_ENERGY * probabilityOfHit);
-        console.log(firePower);
       }
       const HIGH_HIT_PROBABILITY_THRESHOLD = 0.85;
       if (probabilityOfHit > HIGH_HIT_PROBABILITY_THRESHOLD) {
         firePower = MAX_MISSILE_ENERGY;
-        console.log(firePower);
       }
       const missileEnergy = firePower * MISSILE_ENERGY_MULTIPLIER;
       const missileEnergyAtImpact = missileEnergy - (target.distance / MISSILE_SPEED);
       if (tank.powerup?.type === "firepower") {
         firePower *= 1 + probabilityOfHit;
-        console.log(firePower);
       }
-      console.log(missileEnergyAtImpact, firePower);
       if (firePower > MIN_FIRE_POWER && missileEnergyAtImpact > firePower) {
         saved.lastMissileId = tank.fire(firePower);
       }

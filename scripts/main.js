@@ -321,10 +321,10 @@ function animate(currentTime) {
         // Game over
         if (iteration === MAX_ITERATIONS) {
             let winner = { name: "Draw" };
-            if (tanks[0].energy > tanks[1].energy) {
+            if (tanks[0].matchScore > tanks[1].matchScore) {
                 winner = tanks[0];
             }
-            else if (tanks[1].energy > tanks[0].energy) {
+            else if (tanks[1].matchScore > tanks[0].matchScore) {
                 winner = tanks[1];
             }
             if (winner.index || winner.index === 0) {

@@ -332,18 +332,19 @@ function main(tank, arena) {
         tank.gunTurn = tank.calculateGunTurn(predictedTargetX, predictedTargetY);
 
         // Calculate firing conditions
-        const aimAccuracyThreshold = Math.min(5, Math.atan2(MAX_ACTUAL_SPEED * timeToIntercept, target.distance) * DEGREES);
+        const aimAccuracyThreshold = Math.min(1, Math.atan2(MAX_ACTUAL_SPEED * timeToIntercept, target.distance) * DEGREES);
         const predictedTargetAngle = tank.angleTo(predictedTargetX, predictedTargetY);
         const gunAngleDifference = tank.angleDifference(tank.bodyAim + tank.gunAim, predictedTargetAngle);
         const aimError = Math.abs(gunAngleDifference);
         const aimErrorThreshold = aimAccuracyThreshold * (1 - (target.distance / arena.width) ** 2);
         const perpendicularSpeedComponent = Math.abs(tank.perpendicularSpeedComponent(target));
-        const historicAccuracy = tank.aimAccuracy || 0.5;
+        const historicAccuracy = tank.aimAccuracy || 0.25;
         const probabilityOfHit = (1 - aimError / aimErrorThreshold) * (
             (1 - target.distance / MAX_DISTANCE) *
             (1 - perpendicularSpeedComponent) ** 2
         );
-        if (aimError < aimErrorThreshold && probabilityOfHit >= 0.5) {
+        const hitProbabilityThreshold = (1 - (tank.energy / (tank.energy + target.energy))) / 2;
+        if (aimError < aimErrorThreshold && probabilityOfHit >= hitProbabilityThreshold) {
             const minFirePower = 5;
             const accuracyBonus = MAX_MISSILE_ENERGY * historicAccuracy ** (1 / 2) * probabilityOfHit ** 2;
             let firePower = (tank.energyLow) ? minFirePower : Math.min(MAX_MISSILE_ENERGY, minFirePower + accuracyBonus);
