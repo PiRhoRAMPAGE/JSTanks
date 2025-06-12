@@ -352,18 +352,20 @@ function main(tank, arena) {
             if (firePower > MAX_MISSILE_ENERGY) {
                 firePower = MAX_MISSILE_ENERGY;
             }
-            const weaponUpgrades = [ "guncool", "firepower" ];
-            if (weaponUpgrades.includes(tank.powerup.type) || Math.random() > 0.9) {
+            if (Math.random() > 0.9) {
                 firePower = Math.max(firePower, MAX_MISSILE_ENERGY * probabilityOfHit);
+            }
+            if (tank.powerup?.type === "guncool") {
+                firePower = minFirePower + (minFirePower * 3) * probabilityOfHit;
+            }
+            if (tank.powerup?.type === "firepower") {
+                firePower *= 1 + probabilityOfHit;
             }
             if (probabilityOfHit > 0.75) {
                 firePower = MAX_MISSILE_ENERGY;
             }
             const missileEnergy = firePower * MISSILE_ENERGY_MULTIPLIER;
             const missileEnergyAtImpact = missileEnergy - (target.distance / MISSILE_SPEED);
-            if (tank.powerup?.type === "firepower") {
-                firePower *= 1 + probabilityOfHit;
-            }
             if (firePower > minFirePower && missileEnergyAtImpact > firePower) {
                 saved.lastMissileId = tank.fire(firePower);
             }
@@ -567,6 +569,7 @@ function main(tank, arena) {
             tank.bodyTurn = angleDifference / 180;
         }
         
+
     }
     
 
@@ -577,8 +580,8 @@ function main(tank, arena) {
         saved.powerup = tank.detectedPowerups[0];
         saved.powerup.priority = tank.getPowerupPriority(saved.powerup);
         saved.powerup.isNearWall = (
-            Math.abs(saved.powerup.x) > arena.width / 2 * 0.75 ||
-            Math.abs(saved.powerup.y) > arena.height / 2 * 0.75
+            Math.abs(saved.powerup.x) > arena.width / 2 - Math.abs(tank.actualSpeed * 10) ||
+            Math.abs(saved.powerup.y) > arena.height / 2 -  Math.abs(tank.actualSpeed * 10)
         );
     }
     
@@ -592,28 +595,32 @@ function main(tank, arena) {
     if (saved.powerup && saved.target) {
         const targetAngle = tank.angleTo(saved.target.x, saved.target.y);
         const powerupAngle = tank.angleTo(saved.powerup.x, saved.powerup.y);
-        let angleOffset = Math.abs(tank.angleDifference(targetAngle, powerupAngle));
+        let angleOffset = (tank.angleDifference(targetAngle, powerupAngle) + 36000) % 360;
+        if (angleOffset > 180) {
+            angleOffset -= 360;
+        }
+        angleOffset = Math.abs(angleOffset);
         if (angleOffset > 90) {
             angleOffset = 90 - (angleOffset - 90);
         }
-        let trajectoryFactor = 1 - angleOffset / 90;
-        let gunHeatFactor = 1 - saved.target.gunHeat /  MAX_GUN_HEAT;
+        let trajectoryFactor = (angleOffset / 90) ** (1 / 2);
+        let gunHeatFactor = 1 - saved.target.gunHeat / MAX_GUN_HEAT;
         const distanceFactor = (1 - tank.distanceTo(saved.powerup.x, saved.powerup.y) / MAX_DISTANCE) ** 2;
         const targetDistanceFactor = tank.distanceTo(saved.target.x, saved.target.y) / MAX_DISTANCE;
         const missileFactor = (saved.incomingMissiles || []).length;
-        const evasionFactor = saved.missileEvasion / COLLISION_COOLDOWN_TIME
+        const evasionFactor = saved.missileEvasion / COLLISION_COOLDOWN_TIME;
         const numerator = (
-            distanceFactor * 0.5 +
-            trajectoryFactor * 0.3 +
-            targetDistanceFactor * 0.2
+            distanceFactor * 0.7 +
+            targetDistanceFactor * 0.3
         )
         const denominator = (
             1 +
+            trajectoryFactor +
             missileFactor +
             gunHeatFactor +
             evasionFactor
         )
-        saved.powerup.safety = numerator / denominator;
+        saved.powerup.safety = (numerator / denominator);
     }
     
     // Check for execeptions to getting the powerup
@@ -730,7 +737,12 @@ function main(tank, arena) {
     }
 
     // Handle energy regeneration
-    if (tank.conserveEnergy && tank.energy < MAX_TANK_ENERGY && !saved.willBeHitByMissile && !saved.isSeekingPowerup) {
+    const conservationExceptions = (
+        saved.approachTarget ||
+        saved.willBeHitByMissile ||
+        saved.isSeekingPowerup
+    )
+    if (tank.conserveEnergy && tank.energy < MAX_TANK_ENERGY && !conservationExceptions) {
         tank.speed = 0;
     }
 

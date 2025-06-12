@@ -114,7 +114,7 @@ function newGame() {
     tanks[1] = new Tank(tankBFunction, 1, x, y, getRandomColorHex());
 
     // Randomize tank order to eliminate positional advantages
-    tanks = tanks.sort(() => Math.random() - 0.5);
+    tanks = shuffleArray(tanks);
 
     // Define the arena
     arena = {
@@ -128,6 +128,13 @@ function newGame() {
     }
 }
 
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
 
 document.addEventListener("DOMContentLoaded", () => {
     gamepad.initialize();
@@ -327,6 +334,12 @@ function animate(currentTime) {
             else if (tanks[1].matchScore > tanks[0].matchScore) {
                 winner = tanks[1];
             }
+            if (tanks[0].energy > tanks[1].energy) {
+                winner = tanks[0];
+            }
+            else if (tanks[1].energy > tanks[0].energy) {
+                winner = tanks[1];
+            }
             if (winner.index || winner.index === 0) {
                 winCounts[winner.index]++;
                 const energyBonus = ~~Math.max(0, winner.energy * SURVIVAL_BONUS_POINTS);
@@ -339,6 +352,12 @@ function animate(currentTime) {
         }
         if (arena.tanks.length === 0 && !gameOver) {
             let winner = { name: "Draw" };
+            if (tanks[0].matchScore > tanks[1].matchScore) {
+                winner = tanks[0];
+            }
+            else if (tanks[1].matchScore > tanks[0].matchScore) {
+                winner = tanks[1];
+            }
             logGameData(winner);
             newGame();
         }
@@ -691,8 +710,8 @@ function updateLeaderboard(winner, tanks) {
 function generateLeaderboardTable() {
     let tableHTML = `<br><h3>Tank's Ranks</h3><table id="tblLeaderboard">`;
     const tankNames = Object.keys(leaderboard).sort((a, b) => {
-        const avgA = leaderboard[a]._average || 0;
-        const avgB = leaderboard[b]._average || 0;
+        const avgA = leaderboard[a].elo || 0;
+        const avgB = leaderboard[b].elo || 0;
         return avgB - avgA;
     });
     if (tankNames.length > 0) {
@@ -722,6 +741,10 @@ function generateLeaderboardTable() {
             }
             const h2hAB = leaderboard[tankAName] ? leaderboard[tankAName][tankBName] : null;
             const h2hBA = leaderboard[tankBName] ? leaderboard[tankBName][tankAName] : null;
+            let eloDifference = Math.round(leaderboard[tankAName].elo - leaderboard[tankBName].elo);
+            if (eloDifference > 0) {
+                eloDifference = `+${eloDifference}`;
+            }
             let tankAWinPct = 0;
             if (h2hAB && h2hAB.matches > 0) {
                 tankAWinPct = (h2hAB.wins / h2hAB.matches) * 100;
