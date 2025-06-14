@@ -206,6 +206,7 @@ class Tank {
             angleFrom: (x, y) => Math.atan2(this.y - y, this.x - x) * 180 / Math.PI,
             distanceTo: (x, y) => Math.sqrt((y - this.y) ** 2 + (x - this.x) ** 2),
             fire: (energy) => this.fire(arena, energy),
+            message: "",
         }
         
         const arenaData = {
@@ -319,6 +320,7 @@ class Tank {
             "retained",
             "victoryMessage",
             "indicator",
+            "message"
         ]
         for (let action of required) {
             if (!actions.hasOwnProperty(action)) {
@@ -434,9 +436,6 @@ class Tank {
                 errors.push("tank.retained must be a valid JSON object");
             }
         }
-        if (actions.victoryMessage) {
-            this.victoryMessage = actions.victoryMessage.toString().substring(0, 256);
-        }
         if (actions.handicap) {
             if (!isNaN(actions.handicap)) {
                 if (!isNaN(actions.handicap) && actions.handicap > 0 && actions.handicap <= 1) {
@@ -462,6 +461,32 @@ class Tank {
                     console.log(actions.indicator)
                     errors.push("tank.indicator.intensity must be a number between 0 and 1");
                 }
+            }
+        }
+        if (actions.message) {
+            if (typeof actions.message === "number") {
+                actions.message = actions.message.toString();
+            }
+            if (typeof actions.message === "string") {
+                if (actions.message.length > 64) {
+                    actions.message = actions.message.substring(64);
+                }
+                this.message = actions.message;
+                this.showMessage = 50;
+            }
+            else {
+                errors.push("tank.message must be a string or number (max length: 64)");
+            }
+        }
+        if (actions.victoryMessage) {
+            if (typeof actions.victoryMessage === "number") {
+                actions.victoryMessage = actions.victoryMessage.toString();
+            }
+            if (typeof actions.victoryMessage === "string") {
+                this.victoryMessage = actions.victoryMessage.toString().substring(0, 64);
+            }
+            else {
+                errors.push("tank.victoryMessage must be a string or number (max length: 64)");
             }
         }
         if (errors.length > 0) {
@@ -794,37 +819,39 @@ class Tank {
         const MAX_RADAR_ARC_DEGREES = 90;
     
         arena.powerups.forEach((other) => {
-            const dx = other.x - this.x;
-            const dy = other.y - this.y;
-            const distance = Math.sqrt(dx ** 2 + dy ** 2);
-            const angleToOther = Math.atan2(dy, dx) * 180 / Math.PI;
-
-            // Calculate the shortest angle difference
-            let angleDifference = Math.abs(angleToOther - radarDirection + 360) % 360;
-            angleDifference = Math.min(angleDifference, 360 - angleDifference);
-
-            // Calculate the actual radar arc size in degrees based on the normalized value
-            const currentRadarArcDegrees = this.radarArc * MAX_RADAR_ARC_DEGREES;
-
-            // Check if the powerup is within the radar's arc
-            if (angleDifference <= currentRadarArcDegrees / 2 + Math.atan2(other.size, distance) * 180 / Math.PI) {
-                this.detectedPowerups.push({
-                    type: other.type,
-                    amount: other.amount,
-                    angleTo: angleToOther,
-                    distance: distance,
-                    duration: other.duration,
-                    x: other.x,
-                    y: other.y,
-                });
-                this.detectedPowerups.sort((a, b) => {
-                    return a.distance - b.distance;
-                });
-            }
-            
-            // Check if powerup is close enough to collect
-            if (distance < other.size + this.size * 2) {
-                other.collect(this);
+            if (other.state === "active") {
+                const dx = other.x - this.x;
+                const dy = other.y - this.y;
+                const distance = Math.sqrt(dx ** 2 + dy ** 2);
+                const angleToOther = Math.atan2(dy, dx) * 180 / Math.PI;
+    
+                // Calculate the shortest angle difference
+                let angleDifference = Math.abs(angleToOther - radarDirection + 360) % 360;
+                angleDifference = Math.min(angleDifference, 360 - angleDifference);
+    
+                // Calculate the actual radar arc size in degrees based on the normalized value
+                const currentRadarArcDegrees = this.radarArc * MAX_RADAR_ARC_DEGREES;
+    
+                // Check if the powerup is within the radar's arc
+                if (angleDifference <= currentRadarArcDegrees / 2 + Math.atan2(other.size, distance) * 180 / Math.PI) {
+                    this.detectedPowerups.push({
+                        type: other.type,
+                        amount: other.amount,
+                        angleTo: angleToOther,
+                        distance: distance,
+                        duration: other.duration,
+                        x: other.x,
+                        y: other.y,
+                    });
+                    this.detectedPowerups.sort((a, b) => {
+                        return a.distance - b.distance;
+                    });
+                }
+                
+                // Check if powerup is close enough to collect
+                if (distance < other.size + this.size * 2) {
+                    other.collect(this);
+                }
             }
         });
     }

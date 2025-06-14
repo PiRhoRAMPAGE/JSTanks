@@ -40,6 +40,7 @@ class PowerUp {
     }
     
     collect(tank) {
+        if (this.state !== "active") return;
         // Handle energy differently, so you dont lose oter powerups if you pick it up.
         if (this.type === "energy") {
             tank.energy += this.amount;

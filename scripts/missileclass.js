@@ -112,7 +112,7 @@ class Missile {
                 const distance = Math.sqrt(dx ** 2 + dy ** 2);
                 const damage = 1 + ~~this.energy;
                 const collisionAngle = (Math.atan2(this.y - tank.y, this.x - tank.x) * 180 / Math.PI + 360000) % 360;
-                if (distance < this.size + tank.size) {
+                if (distance < this.size * 2 + tank.size) {
                     tank.missileCollision = {
                         ownerId: this.owner.id,
                         angle: collisionAngle,

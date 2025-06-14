@@ -63,7 +63,7 @@ the challenge. For fair play, limit your code's interaction exclusively to the p
 | `ACCURACY_BONUS_POINTS`          | Number       | The amount of bonus points awarded to the winner of the match for accuracy (this amount is multiplied by the winner's accuracy percentage at the end of the match).
 | `TANK_SPEED_BONUS_POINTS`        | Number       | The amount of points awarded for for absolute speed of your tank (this amount is multiplied by the absolute value of the speed of your tank during every iteration).
 | `MISSILE_ENERGY_MULTIPLIER`      | Number       | The multiplier for missile energy.
-| `GUN_HEAT_MULTIPLIER             | Number       | The multiplier for `gunHeat` for tanks.
+| `GUN_HEAT_MULTIPLIER`            | Number       | The multiplier for `gunHeat` for tanks.
 | `MAX_GUN_HEAT`                   | Number       | The maximum possible `gunHeat` for tanks.
 | `SPAWN_POWERUP_PROBABILITY`      | Number       | The probability of a powerup spawning on any given iteration.
 | `MIN_POWERUP_AMOUNT`             | Number       | The minimum amount for powerups.
@@ -164,55 +164,56 @@ the challenge. For fair play, limit your code's interaction exclusively to the p
 
 ## Controllable Properties
 
-| Property Name                    | Data Type   | Acceptable Value       | Default Value | Description
-| -------------------------------- | ----------- | ---------------------- | ------------- | -----------------------------------------------------------------------------------------------------------------------------------------------------
-| `tank.name`                      | String      | Max Length: 20         | "Unnamed"     | The name of your tank.
-| `tank.victoryMessage`            | String      | Max Length: 256        | "Winner"      | A message displayed above your tank when it wins.
-| `tank.color`                     | String      | Hexadecimal Code       | "#000000"     | The outline color of your tank's body.
-| `tank.fillColor`                 | String      | Hexadecimal Code       | "#FFFFFF"     | The fill color of your tank's body.
-| `tank.treadColor`                | String      | Hexadecimal Code       | "#808080"     | The color of your tank's treads.
-| `tank.gunColor`                  | String      | Hexadecimal Code       | "#404040"     | The color of your tank's gun.
-| `tank.radarColor`                | String      | Hexadecimal Code       | "#00FFFF"     | The color of your tank's radar.
-| `tank.speed`                     | Number      | -1 to 1                | 0             | The desired speed of your tank, where `-1` is full reverse, `0` is stop, and `1` is full forward. The actual speed is determined by `tank.speed * MAX_ACTUAL_SPEED`.
-| `tank.bodyTurn`                  | Number      | -1 to 1                | 0             | How much to turn the tank's body per iteration (`-1` = `MAX_BODY_TURN_DEGREES` left, `0` no turn, `1` = `MAX_BODY_TURN_DEGREES` right).
-| `tank.gunTurn`                   | Number      | -1 to 1                | 0             | How much to turn the tank's turret relative to the body per iteration (`-1` = `MAX_GUN_TURN_DEGREES` left, `0` no turn, `1` = `MAX_GUN_TURN_DEGREES` right)..
-| `tank.radarTurn`                 | Number      | -1 to 1                | 0             | How much to turn the radar relative to the body and gun per iteration (`-1` = `MAX_RADAR_TURN_DEGREES` left, `0` no turn, `1` = `MAX_RADAR_TURN_DEGREES` right).
-| `tank.radarArc`                  | Number      | 0 to 1                 | 1             | The width of your radar's scanning arc (`0` = 0 degrees, `1` = `MAX_RADAR_ARC_DEGREES` degrees).
-| `tank.handicap`                  | Number      | 0 to 1                 | 0             | An optional handicap (`0` full damage, `1` no damage). Higher values reduce damage dealt to targets.
-| `tank.retained`                  | JSON Object | Any Valid JSON         | {}            | An empty JSON object for storing persistent data across iterations.
-| `tank.indicator`                 | Object      | Expected Properties    | {}            | An object containing the color and intensity values for your tanks indicator light.
-|    - `color`                     | String      | Hexadecimal Code       | "#00FF00"     | The color of your tanks indicator light
-|    - `intensity`                 | Number      | 0 to 1                 | 0             | The intensity (brightness) of your tanks indicator light
+| Property Name                    | Data Type    | Acceptable Value       | Default Value | Description
+| -------------------------------- | ------------ | ---------------------- | ------------- | -----------------------------------------------------------------------------------------------------------------------------------------------------
+| `tank.name`                      | String       | Max Length: 20         | "Unnamed"     | The name of your tank.
+| `tank.message`                   | String       | Max Length: 64         | ""            | A nessage to be displayed above your tank during the match.
+| `tank.victoryMessage`            | String       | Max Length: 64         | "Winner"      | A message displayed above your tank when it wins.
+| `tank.color`                     | String       | Hexadecimal Code       | "#000000"     | The outline color of your tank's body.
+| `tank.fillColor`                 | String       | Hexadecimal Code       | "#FFFFFF"     | The fill color of your tank's body.
+| `tank.treadColor`                | String       | Hexadecimal Code       | "#808080"     | The color of your tank's treads.
+| `tank.gunColor`                  | String       | Hexadecimal Code       | "#404040"     | The color of your tank's gun.
+| `tank.radarColor`                | String       | Hexadecimal Code       | "#00FFFF"     | The color of your tank's radar.
+| `tank.speed`                     | Number       | -1 to 1                | 0             | The desired speed of your tank, where `-1` is full reverse, `0` is stop, and `1` is full forward. The actual speed is determined by `tank.speed * MAX_ACTUAL_SPEED`.
+| `tank.bodyTurn`                  | Number       | -1 to 1                | 0             | How much to turn the tank's body per iteration (`-1` = `MAX_BODY_TURN_DEGREES` left, `0` no turn, `1` = `MAX_BODY_TURN_DEGREES` right).
+| `tank.gunTurn`                   | Number       | -1 to 1                | 0             | How much to turn the tank's turret relative to the body per iteration (`-1` = `MAX_GUN_TURN_DEGREES` left, `0` no turn, `1` = `MAX_GUN_TURN_DEGREES` right)..
+| `tank.radarTurn`                 | Number       | -1 to 1                | 0             | How much to turn the radar relative to the body and gun per iteration (`-1` = `MAX_RADAR_TURN_DEGREES` left, `0` no turn, `1` = `MAX_RADAR_TURN_DEGREES` right).
+| `tank.radarArc`                  | Number       | 0 to 1                 | 1             | The width of your radar's scanning arc (`0` = 0 degrees, `1` = `MAX_RADAR_ARC_DEGREES` degrees).
+| `tank.handicap`                  | Number       | 0 to 1                 | 0             | An optional handicap (`0` full damage, `1` no damage). Higher values reduce damage dealt to targets.
+| `tank.retained`                  | JSON Object  | Any Valid JSON         | {}            | An empty JSON object for storing persistent data across iterations.
+| `tank.indicator`                 | Object       | Expected Properties    | {}            | An object containing the color and intensity values for your tanks indicator light.
+|    - `color`                     | String       | Hexadecimal Code       | "#00FF00"     | The color of your tanks indicator light
+|    - `intensity`                 | Number       | 0 to 1                 | 0             | The intensity (brightness) of your tanks indicator light
 
 
 
 ## Tank Methods
 
-| Method Name                      | Returns   | Description
-| -------------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-| `tank.angleTo(x, y)`             | Number    | Returns the angle from your tank to the specified `x` and `y` coordinates.
-| `tank.angleFrom(x, y)`           | Number    | Returns the angle the specified `x` and `y` coordinates to your tank.
-| `tank.distanceTo(x, y)`          | Number    | Returns the distance your tank to the specified `x` and `y` coordinates.
-| `tank.fire(energy)`              | Number    | Fires a missile with the specified `energy`. The missile energy is limited `MAX_MISSILE_ENERGY`. Can not fire if `tank.gunHeat > 0` Returns `id` of fired missile (used as a key for `tank.missiles`).
+| Method Name                      | Returns      | Description
+| -------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+| `tank.angleTo(x, y)`             | Number       | Returns the angle from your tank to the specified `x` and `y` coordinates.
+| `tank.angleFrom(x, y)`           | Number       | Returns the angle the specified `x` and `y` coordinates to your tank.
+| `tank.distanceTo(x, y)`          | Number       | Returns the distance your tank to the specified `x` and `y` coordinates.
+| `tank.fire(energy)`              | Number       | Fires a missile with the specified `energy`. The missile energy is limited `MAX_MISSILE_ENERGY`. Can not fire if `tank.gunHeat > 0` Returns `id` of fired missile (used as a key for `tank.missiles`).
 
 
 ## Arena Methods
 
-| Method Name                      | Returns   | Description
-| -------------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-| `nearestWallAngle(x, y)`         | Number    | Returns the angle to the nearest wall (degrees, absolute)
-| `nearestWallDistance(x, y)`      | Number    | Returns the distance to the nearest wall
-| `contains(x, y, margin = 0)`     | Boolean   | `true` if the specified point is within the margins of the arena, `false` otherwise.
+| Method Name                      | Returns      | Description
+| -------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+| `nearestWallAngle(x, y)`         | Number       | Returns the angle to the nearest wall (degrees, absolute)
+| `nearestWallDistance(x, y)`      | Number       | Returns the distance to the nearest wall
+| `contains(x, y, margin = 0)`     | Boolean      | `true` if the specified point is within the margins of the arena, `false` otherwise.
 
 
 ## Powerups
 
-| Powerup Name                     | Returns   | Description
-| -------------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-| `energy`                         | N/A       | Increases your tank's energy by the specified amount. (🔋)
-| `speed`                          | N/A       | Doubles the number of iterations your tank gets per frame. (⚡️)
-| `firepower`                      | N/A       | Doubles the energy of missiles fired by your tank. (🔥)
-| `guncool`                        | N/A       | Decreases gunheat by half and doubles the guns rate of cooling. (❄️)
+| Powerup Name                     | Returns      | Description
+| -------------------------------- | ------------64 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+| `energy`                         | N/A          | Increases your tank's energy by the specified amount. (🔋)
+| `speed`                          | N/A          | Doubles the number of iterations your tank gets per frame. (⚡️)
+| `firepower`                      | N/A          | Doubles the energy of missiles fired by your tank. (🔥)
+| `guncool`                        | N/A          | Decreases gunheat by half and doubles the guns rate of cooling. (❄️)
 
 
 

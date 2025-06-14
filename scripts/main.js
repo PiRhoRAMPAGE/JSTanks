@@ -91,12 +91,15 @@ function startGame() {
 }
 
 function newGame() {
+    if (gameCount === 50) {
+        location.reload();
+    }
     iteration = 0;
     tanks = [];
     arena = {};
     gameOver = false;
     gameCount++;
-
+    
     const distance = (Math.min(canvas.width, canvas.height) / 2) * 0.7;
     let angle = Math.random() * 360;
 
@@ -246,7 +249,7 @@ function animate(currentTime) {
                 ctx.fillText(p1.name, 8, 8);
 
                 // Show tank A score
-                let pickup = (p1.powerup.amount) > 0 ? p1.powerup.symbol : "";
+                let pickup = (p1.powerup.amount > 0) ? p1.powerup.symbol : "";
                 ctx.font = "7px 'Press start 2P'";
                 ctx.strokeStyle = "#000000";
                 ctx.lineWidth = 1;

@@ -332,41 +332,35 @@ function main(tank, arena) {
         tank.gunTurn = tank.calculateGunTurn(predictedTargetX, predictedTargetY);
 
         // Calculate firing conditions
-        const aimAccuracyThreshold = Math.min(1, Math.atan2(MAX_ACTUAL_SPEED * timeToIntercept, target.distance) * DEGREES);
+        let aimAccuracyThreshold = Math.min(2 + 2 * tank.aimAccuracy, Math.atan2(MAX_ACTUAL_SPEED * timeToIntercept, target.distance) * DEGREES);
         const predictedTargetAngle = tank.angleTo(predictedTargetX, predictedTargetY);
         const gunAngleDifference = tank.angleDifference(tank.bodyAim + tank.gunAim, predictedTargetAngle);
         const aimError = Math.abs(gunAngleDifference);
         const aimErrorThreshold = aimAccuracyThreshold * (1 - (target.distance / arena.width) ** 2);
         const perpendicularSpeedComponent = Math.abs(tank.perpendicularSpeedComponent(target));
-        const historicAccuracy = tank.aimAccuracy || 0.25;
+        const historicAccuracy = tank.aimAccuracy || 0.5;
         const probabilityOfHit = (1 - aimError / aimErrorThreshold) * (
             (1 - target.distance / MAX_DISTANCE) *
             (1 - perpendicularSpeedComponent) ** 2
         );
-        const hitProbabilityThreshold = (1 - (tank.energy / (tank.energy + target.energy))) / 2;
+        let hitProbabilityThreshold = (target.distance / MAX_DISTANCE) ** (1 / 2);
         if (aimError < aimErrorThreshold && probabilityOfHit >= hitProbabilityThreshold) {
-            const minFirePower = 5;
-            const accuracyBonus = MAX_MISSILE_ENERGY * historicAccuracy ** (1 / 2) * probabilityOfHit ** 2;
+            const minFirePower = MAX_MISSILE_ENERGY * ((historicAccuracy + probabilityOfHit) / 2);
+            const accuracyBonus = MAX_MISSILE_ENERGY * historicAccuracy ** (1 / 3) * probabilityOfHit ** 2;
             let firePower = (tank.energyLow) ? minFirePower : Math.min(MAX_MISSILE_ENERGY, minFirePower + accuracyBonus);
             firePower *= 4 - (target.distance / MAX_DISTANCE) * 3;
-            if (firePower > MAX_MISSILE_ENERGY) {
-                firePower = MAX_MISSILE_ENERGY;
-            }
-            if (Math.random() > 0.9) {
-                firePower = Math.max(firePower, MAX_MISSILE_ENERGY * probabilityOfHit);
-            }
-            if (tank.powerup?.type === "guncool") {
-                firePower = minFirePower + (minFirePower * 3) * probabilityOfHit;
-            }
             if (tank.powerup?.type === "firepower") {
                 firePower *= 1 + probabilityOfHit;
             }
-            if (probabilityOfHit > 0.75) {
+            if ((historicAccuracy * 0.5 + probabilityOfHit * 0.5) > 0.5 || Math.random() > 0.95) {
+                firePower = MAX_MISSILE_ENERGY;
+            }
+            if (firePower > MAX_MISSILE_ENERGY) {
                 firePower = MAX_MISSILE_ENERGY;
             }
             const missileEnergy = firePower * MISSILE_ENERGY_MULTIPLIER;
             const missileEnergyAtImpact = missileEnergy - (target.distance / MISSILE_SPEED);
-            if (firePower > minFirePower && missileEnergyAtImpact > firePower) {
+            if (missileEnergyAtImpact > firePower) {
                 saved.lastMissileId = tank.fire(firePower);
             }
         }
@@ -603,30 +597,25 @@ function main(tank, arena) {
         if (angleOffset > 90) {
             angleOffset = 90 - (angleOffset - 90);
         }
-        let trajectoryFactor = (angleOffset / 90) ** (1 / 2);
+        let trajectoryFactor = 1 - angleOffset / 90;
         let gunHeatFactor = 1 - saved.target.gunHeat / MAX_GUN_HEAT;
-        const distanceFactor = (1 - tank.distanceTo(saved.powerup.x, saved.powerup.y) / MAX_DISTANCE) ** 2;
-        const targetDistanceFactor = tank.distanceTo(saved.target.x, saved.target.y) / MAX_DISTANCE;
-        const missileFactor = (saved.incomingMissiles || []).length;
+        const distanceFactor = tank.distanceTo(saved.powerup.x, saved.powerup.y) / MAX_DISTANCE;
+        const missileFactor = Math.min(1, (saved.incomingMissiles || []).length / 3);
         const evasionFactor = saved.missileEvasion / COLLISION_COOLDOWN_TIME;
-        const numerator = (
-            distanceFactor * 0.7 +
-            targetDistanceFactor * 0.3
-        )
-        const denominator = (
-            1 +
-            trajectoryFactor +
-            missileFactor +
-            gunHeatFactor +
-            evasionFactor
-        )
-        saved.powerup.safety = (numerator / denominator);
+        const totalRisk = (
+            trajectoryFactor * 0.4 +
+            distanceFactor * 0.2 +
+            gunHeatFactor * 0.2 +
+            missileFactor * 0.1 +
+            evasionFactor * 0.1
+        );
+        saved.powerup.safety = 1 - totalRisk;
     }
     
     // Check for execeptions to getting the powerup
     if (saved.powerup) {
         const distanceToPowerup = tank.distanceTo(saved.powerup.x, saved.powerup.y);
-        saved.powerup.safetyThreshold = 1 - saved.powerup.priority / 10;
+        saved.powerup.safetyThreshold = (1 - saved.powerup.priority / 20) * (distanceToPowerup / MAX_DISTANCE);
         if (saved.powerup.type === "energy") {
             const newSafetyThreshold = (saved.powerup.safety + distanceToPowerup / MAX_DISTANCE) / 2;
             saved.powerup.safetyThreshold = Math.min(saved.powerup.safetyThreshold, newSafetyThreshold);
@@ -780,5 +769,3 @@ function main(tank, arena) {
 
     
 }
-
-
