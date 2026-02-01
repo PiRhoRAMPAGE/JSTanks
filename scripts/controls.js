@@ -1,10 +1,12 @@
+ // Use currentPage for returning to the correct page when turning animations on
+ let currentPage = "tanks";
 
 // Set up tool tips to explain controls
 document.getElementById("btnLeaderboard").title = "View the leaderboard.";
 document.getElementById("divSpeed").title = "Select the game speed.";
 document.getElementById("divView").title = "Show animations:\nDisable to run game at max speed.";
 document.getElementById("divSound").title = "Disable sounds:\nSounds are not recommended at height game speeds";
-document.getElementById("divBlocking").title = "Allow blocking:\nWhen enabled missiles can intercept each other.";
+document.getElementById("divBlocking").title = "Missile Interception:\nWhen enabled missiles can intercept, and detonate each other.";
 document.getElementById("divPowerups").title = "Enable Powerups:\nWhen enabled powerups will randomly spawn.";
 
 const btnLeaderboard = document.getElementById("btnLeaderboard");
@@ -12,12 +14,16 @@ const divLeaderboard = document.getElementById("divLeaderboard");
 const btnNewGame = document.getElementById("btnNewGame");
 const btnCancelNewGame = document.getElementById("btnCancelNewGame");
 const btnStartNewGame = document.getElementById("btnStartGame");
+const btnStartTournament = document.getElementById("btnStartTournament");
 const selGameSpeed = document.getElementById("selSpeed");
 const showAnimation = document.getElementById("toggleView");
 const enableSound = document.getElementById("toggleSound");
 const allowBlocking = document.getElementById("toggleBlocking");
 const powerupsEnabled = document.getElementById("togglePowerups");
 
+if (urlParams.has("headless")) {
+    showAnimation.checked = false;
+}
 
 let paused = false;
 let resumeSpeed = 1;
@@ -90,12 +96,15 @@ document.addEventListener("keyup", (event) => {
     else if (event.key === "0") {
         toggleView.checked = true;
         paused = !paused;
-        soundPause(paused);
         if (paused) {
             resumeSpeed = selGameSpeed.value;
             selGameSpeed.value = 0;
+            sounds.forEach(sound => sound.pause());
+            playSound("pause");
         }
         else {
+            playSound("unpause");
+            sounds.forEach(sound => sound.play());
             selGameSpeed.value = resumeSpeed;
         }
         stepMode = false;
@@ -193,20 +202,43 @@ btnStartGame.addEventListener("click", () => {
     }
 });
 
+btnStartTournament.addEventListener("click", () => {
+    let confirmed = confirm("This will begin a round robin tournament for all tanks.");
+    if (confirmed) {
+        divTanks.style.display = "none";
+        startTournament();
+    }
+});
+
 selGameSpeed.addEventListener("change", () => {
     toggleView.checked = true;
 });
 
 btnLeaderboard.addEventListener("click", () => {
     if (divLeaderboard.style.display === "none") {
-        btnLeaderboard.title = "Hide the leaderboard.";
-        btnLeaderboard.innerHTML = "<center>Hide<br>Ranks</center>";
-        divLeaderboard.style.display = "flex";
+        showRanks();
+        return;
     }
-    else {
-        btnLeaderboard.title = "View the leaderboard.";
-        btnLeaderboard.innerHTML = "<center>Show<br>Ranks</center>";
-        divLeaderboard.style.display = "none";
-    }
-    
+    hideRanks();    
 });
+
+showAnimation.addEventListener("click", () => {
+    if (showAnimation.checked && currentPage === "tanks") {
+        hideRanks();
+    }
+});
+
+function showRanks(setCurrentPage = true) {
+    if (setCurrentPage) currentPage = "ranks"; // for returning to the correct page when turning animations on
+    btnLeaderboard.title = "Hide the leaderboard.";
+    btnLeaderboard.innerHTML = "<center>Hide<br>Ranks</center>";
+    divLeaderboard.innerHTML = generateLeaderboardTable();
+    divLeaderboard.style.display = "flex";
+}
+
+function hideRanks() {
+    currentPage = "tanks"; // for returning to the correct page when turning animations on
+    btnLeaderboard.title = "View the leaderboard.";
+    btnLeaderboard.innerHTML = "<center>Show<br>Ranks</center>";
+    divLeaderboard.style.display = "none";
+}

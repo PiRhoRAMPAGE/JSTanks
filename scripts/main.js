@@ -19,6 +19,7 @@ let missilesFired = [0, 0];
 let missilesHit = [0, 0];
 let tankCollisions = [0, 0];
 let missileCollisions = [0, 0];
+let missileInterceptions = [0, 0];
 let wallCollisions = [0, 0];
 let accuracy = {};
 let accuracyPercentageDif = {};
@@ -52,6 +53,12 @@ document.addEventListener("keydown", (event) => {
     }
 });
 
+document.addEventListener("DOMContentLoaded", () => {
+    if (urlParams.has("start")) {
+        divTanks.style.display = "none";
+        setTimeout(startGame, 500);
+    }
+});
 
 function startGame() {
     if (gameLooper) clearTimeout(gameLooper);
@@ -91,15 +98,19 @@ function startGame() {
 }
 
 function newGame() {
-    if (gameCount === 50) {
-        location.reload();
+    if (isTournament && tournamentIndex >= tournamentMatch.length) {
+        return;
+    }
+    if (!document.getElementById("toggleView").checked) {
+        // Do not set the current page to "ranks", so that when animations are enabled, the game will return to the main screen ("tanks").
+        showRanks(false); 
     }
     iteration = 0;
     tanks = [];
     arena = {};
     gameOver = false;
     gameCount++;
-    
+
     const distance = (Math.min(canvas.width, canvas.height) / 2) * 0.7;
     let angle = Math.random() * 360;
 
@@ -108,13 +119,13 @@ function newGame() {
     let y = distance * Math.sin(angle * Math.PI / 180);
     // Use the selected tank A AI
     const tankAFunction = typeof getSelectedTankA === "function" ? getSelectedTankA() : tankAMain;
-    tanks[0] = new Tank(tankAFunction, 0, x, y, getRandomColorHex());
+    tanks[0] = new Tank(tankFileA, tankAFunction, 0, x, y, getRandomColorHex());
 
     x = distance * Math.cos(180 + angle * Math.PI / 180);
     y = distance * Math.sin(180 + angle * Math.PI / 180);
     // Use the selected tank B AI
     const tankBFunction = typeof getSelectedTankB === "function" ? getSelectedTankB() : tankBMain;
-    tanks[1] = new Tank(tankBFunction, 1, x, y, getRandomColorHex());
+    tanks[1] = new Tank(tankFileB, tankBFunction, 1, x, y, getRandomColorHex());
 
     // Randomize tank order to eliminate positional advantages
     tanks = shuffleArray(tanks);
@@ -125,10 +136,12 @@ function newGame() {
         width: canvas.width,
         height: canvas.height,
         tanks: tanks,
+        airplanes: [],
         missiles: [],
         powerups: [],
         powerupsSpawned: 0,
     }
+
 }
 
 function shuffleArray(array) {
@@ -199,16 +212,39 @@ function animate(currentTime) {
     if (!showAnimation.checked && !paused) gameSpeed = MAX_ITERATIONS;
 
     for (let i = 0; i < gameSpeed; i++) {
+        // Exit conditions
+        if (!arena || arena.tanksRemaining === 0) {
+            return;
+        }
+        if (gameCount >= MAX_MATCHES) {
+            if (isTournament) {
+                if (getNextMatch()) {
+                    startGame(); // Just reset the state and keep going!
+                    return;
+                } 
+                else {
+                    alert("Tournament Complete!");
+                    showRanks(true);
+                    return;
+                }
+            } else {
+                location.reload();
+                break;
+            }
+        }
         // Update gamepad states
         gamepad.update();
 
+        // Spawn powerups
         if (powerupsEnabled.checked && Math.random() < SPAWN_POWERUP_PROBABILITY) {
             spawnPowerup();
         }
         arena.powerupsSpawned = powerupsSpawned;
 
         // Clear the canvas
-        if (showAnimation.checked) ctx.drawImage(background, 0, 0, arena.width, arena.height);
+        if (showAnimation.checked) {
+            ctx.drawImage(background, 0, 0, arena.width, arena.height);
+        }
 
         // Show stats
         if (showAnimation.checked) {
@@ -306,7 +342,7 @@ function animate(currentTime) {
         }
 
         arena.gameCount = gameCount;
-        arena.tanksRemaining = arena.tanks.length;
+        arena.tanksRemaining = arena.tanks?.length || 0;
         arena.missileInterception = allowBlocking.checked;
 
         arena.powerups = arena.powerups.filter((powerup) => {
@@ -326,6 +362,13 @@ function animate(currentTime) {
             }
             if (showAnimation.checked) tank.draw(ctx);
             return tank.state !== "dead";
+        });
+
+        arena.airplanes = arena.airplanes.filter((airplane) => {
+            airplane.update(ctx, arena);
+            if (showAnimation.checked) airplane.draw(ctx, arena);
+            if (gameOver && airplane.motorSound) airplane.motorSound.pause();
+            return airplane.state !== "dead";
         });
 
         // Game over
@@ -386,13 +429,14 @@ function animate(currentTime) {
         }
 
         // Increment iteration
-        if (!gameOver) {
+        if (!gameOver || gameCount > MAX_MATCHES) {
             iteration++;
         }
         else {
             break;
         }
     }
+
 }
 
 
@@ -420,6 +464,8 @@ function logGameData(winner) {
     wallCollisions[1] += tanks[1].wallCollisions;
     missileCollisions[0] += tanks[0].missileCollisions;
     missileCollisions[1] += tanks[1].missileCollisions;
+    missileInterceptions[0] += tanks[0].missileInterceptions;
+    missileInterceptions[1] += tanks[1].missileInterceptions;
     avgEnergy[tanks[0].name] = ~~(energy[0] / gameCount);
     avgEnergy[tanks[1].name] = ~~(energy[1] / gameCount);
     avgEnergyDif[tanks[0].name] = avgEnergy[tanks[0].name] - avgEnergy[tanks[1].name];
@@ -517,16 +563,22 @@ function logGameData(winner) {
             "Difference": ~~Math.abs(powerupsCollectedPercentage[tanks[0].name] - powerupsCollectedPercentage[tanks[1].name]),
         },
         {
-            "Statistic": "Tank Collisions",
-            ...{ [tanks[0].name]: tankCollisions[0] },
-            ...{ [tanks[1].name]: tankCollisions[1] },
-            "Difference": 0,
+            "Statistic": "Missile Interceptions",
+            ...{ [tanks[0].name]: missileInterceptions[0] },
+            ...{ [tanks[1].name]: missileInterceptions[1] },
+            "Difference": Math.abs(missileInterceptions[0] - missileInterceptions[1]),
         },
         {
             "Statistic": "Missile Collisions",
             ...{ [tanks[0].name]: missileCollisions[0] },
             ...{ [tanks[1].name]: missileCollisions[1] },
             "Difference": Math.abs(missileCollisions[0] - missileCollisions[1]),
+        },
+        {
+            "Statistic": "Tank Collisions",
+            ...{ [tanks[0].name]: tankCollisions[0] },
+            ...{ [tanks[1].name]: tankCollisions[1] },
+            "Difference": 0,
         },
         {
             "Statistic": "Wall Collisions",
@@ -559,6 +611,9 @@ function logGameData(winner) {
     console.log(`%c Matches ${gameCount}`, "font-size: 32px;");
     console.table(gameStats);
     console.table(matchStats);
+    if (isTournament) {
+        console.log(`%c Tournament ${Math.round(10000 * tournamentIndex / tournamentMatch.length) / 100}%`, "font-size: 16px;");
+    }
     console.log();
 }
 
@@ -569,25 +624,10 @@ setInterval(() => {
 }, 1000);
 
 window.addEventListener("error", (e) => {
+    gameOver = true;
     selGameSpeed.value = 0;
     console.error(e);
 });
-
-
-function spawnPowerup() {
-    if (arena.powerups.length > 0) return;
-    const options = [
-        { type: "speed", amount: MAX_POWERUP_AMOUNT },
-        { type: "guncool", amount: MAX_POWERUP_AMOUNT },
-        { type: "firepower", amount: MAX_POWERUP_AMOUNT },
-        { type: "energy", amount: MAX_POWERUP_AMOUNT },
-    ];
-    const selectedPowerup = options[~~(Math.random() * options.length)];
-    let powerup = new PowerUp(selectedPowerup.type, selectedPowerup.amount)
-    powerup.amount = Math.max(MIN_POWERUP_AMOUNT, MAX_POWERUP_AMOUNT * Math.random());
-    powerupsSpawned++;
-    arena.powerups.push(powerup);
-}
 
 
 function showError(error) {
@@ -643,7 +683,7 @@ function calculateTotals(tankName) {
             continue;
         }
         const stats = leaderboard[tankName][adversaryName];
-        if (stats && typeof stats.average && stats.matches > 0) {
+        if (stats && typeof stats.average === 'number' && stats.matches > 0) {
             totalWinPercentages += stats.average;
             totalWins += stats.wins;
             totalLosses += stats.losses;
@@ -651,9 +691,9 @@ function calculateTotals(tankName) {
             numberOfOpponents++;
         }
     }
-    const averageOfH2HPct = numberOfOpponents > 0 ? totalWinPercentages / numberOfOpponents : 0;
+    const tournamentAverage = numberOfOpponents > 0 ? totalWinPercentages / numberOfOpponents : 0;
     return {
-        average: averageOfH2HPct,
+        average: tournamentAverage,
         wins: totalWins,
         losses: totalLosses,
         matches: totalMatches,
@@ -710,6 +750,22 @@ function updateLeaderboard(winner, tanks) {
     commitMemory(GLOBAL_STORAGE_KEY, leaderboard);
 }
 
+function calculateGeometricScore(data, tankName) {
+    const stats = data[tankName];
+    if (!stats) return 0;
+    const globalWinRate = stats._average / 100;
+    const localRates = Object.keys(stats)
+        .filter(key => !key.startsWith('_') && key !== 'elo')
+        .map(opponent => stats[opponent].average / 100);
+    const factors = [globalWinRate, ...localRates];
+    const smoothedFactors = factors.map(rate => Math.max(rate, 0.001));
+    const product = smoothedFactors.reduce((acc, rate) => acc * rate, 1);
+    const n = smoothedFactors.length;
+    const geometricMean = Math.pow(product, 1 / n);
+    return geometricMean;
+}
+
+
 function generateLeaderboardTable() {
     let tableHTML = `<br><h3>Tank's Ranks</h3><table id="tblLeaderboard">`;
     const tankNames = Object.keys(leaderboard).sort((a, b) => {
@@ -718,59 +774,54 @@ function generateLeaderboardTable() {
         return avgB - avgA;
     });
     if (tankNames.length > 0) {
-        // Add the table header (<thead>) here
-        tableHTML += `<thead>`;
-        tableHTML += `<tr>`;
-        tableHTML += `<th>Tank</th>`;
-        tableHTML += `<th>Elo</th>`;
-        tableHTML += `<th>Win %</th>`;
-        tableHTML += `<th>Matches</th>`;
-        tableHTML += `</tr>`;
-        tableHTML += `</thead>`;
-        tableHTML += `<tbody>`;
+        tableHTML += `<thead><tr><th>Tank</th><th>Elo</th><th>Win %</th><th>Matches</th></tr></thead><tbody>`;
     }
     tankNames.forEach((tankAName) => {
         const tankAOverallStats = leaderboard[tankAName];
         const tankAOverallWinPct = tankAOverallStats ? (tankAOverallStats._average || 0) : 0;
-        tableHTML += `<tr class="trHeader">`;
+        tableHTML += `<tr class="trHeader" onclick="toggleVsRows('${tankAName}')" style="cursor:pointer;">`;
         tableHTML += `<td><strong>${tankAName}</strong></td>`;
         tableHTML += `<td><strong>${Math.round(tankAOverallStats.elo)}</strong></td>`;
         tableHTML += `<td><strong>${tankAOverallWinPct.toFixed(2)}%</strong></td>`;
-        tableHTML += `<td><strong>${tankAOverallStats._total}</strong></td>`;
+        tableHTML += `<td class="col-matches"><strong>${tankAOverallStats._total}</strong></td>`;
         tableHTML += `</tr>`;
         tankNames.forEach((tankBName) => {
-            if (tankAName === tankBName) {
-                return;
-            }
+            if (tankAName === tankBName) return;
+            const tankBOverallStats = leaderboard[tankBName];
             const h2hAB = leaderboard[tankAName] ? leaderboard[tankAName][tankBName] : null;
-            const h2hBA = leaderboard[tankBName] ? leaderboard[tankBName][tankAName] : null;
-            let eloDifference = Math.round(leaderboard[tankAName].elo - leaderboard[tankBName].elo);
-            if (eloDifference > 0) {
-                eloDifference = `+${eloDifference}`;
-            }
-            let tankAWinPct = 0;
             if (h2hAB && h2hAB.matches > 0) {
-                tankAWinPct = (h2hAB.wins / h2hAB.matches) * 100;
-                let tankBWinPct = 0;
-                if (h2hBA && h2hBA.matches > 0) {
-                    tankBWinPct = (h2hBA.wins / h2hBA.matches) * 100;
+                const tankAWinPct = (h2hAB.wins / h2hAB.matches) * 100;
+                let eloDif = Math.round(tankAOverallStats.elo - tankBOverallStats.elo);
+                if (eloDif === 0) eloDifColor = "#dadb8a";
+                if (eloDif < 0) eloDifColor = "#ff6666";
+                if (eloDif > 0) {
+                    eloDifColor = "#66ff66";
+                    eloDif = `+${eloDif}`;
                 }
-                tableHTML += `<tr>`;
-                tableHTML += `<td>vs. ${tankBName}</td>`;
-                tableHTML += `<td></td>`;
+                const isCurrentMatchup = tankAName === tanks[0]?.name || tankAName === tanks[1]?.name;
+                const display = isCurrentMatchup ? "table-row" : "none";
+                tableHTML += `<tr class="child-row" data-parent="${tankAName}" style="display:${display}; background-color: #2a2a2a;">`;
+                tableHTML += `<td class="col-vs-name" style="padding-left: 20px;">vs. ${tankBName}</td>`;
+                tableHTML += `<td style="color: ${eloDifColor}">${eloDif}</td>`;
                 tableHTML += `<td>${tankAWinPct.toFixed(2)}%</td>`;
-                tableHTML += `<td>${h2hAB.matches}</td>`;
+                tableHTML += `<td class="col-matches">${h2hAB.matches}</td>`;
                 tableHTML += `</tr>`;
             }
         });
     });
     if (tankNames.length > 0) {
         tableHTML += `</tbody></table><button id="btnResetLeaderboard" onclick="resetRanks()">Reset Ranks</button>`;
-    }
-    else {
+    } else {
         tableHTML += "<br>You must run at least one match first.";
     }
     return tableHTML;
+}
+
+function toggleVsRows(tankName) {
+    const rows = document.querySelectorAll(`tr[data-parent="${tankName}"]`);
+    rows.forEach(row => row.style.display = (row.style.display === "none") ? "table-row" : "none");
+    const headerRow = document.querySelector(`tr.trHeader[onclick*="'${tankName}'"]`);
+    if (headerRow) headerRow.classList.toggle('active');
 }
 
 function resetRanks() {
@@ -779,6 +830,7 @@ function resetRanks() {
         leaderboard = {};
         commitMemory(GLOBAL_STORAGE_KEY, {});
         document.getElementById("divLeaderboard").innerHTML = generateLeaderboardTable();
+        hideRanks();
     }
 }
 
@@ -814,3 +866,4 @@ function calculateElos(a, b, winner) {
 }
 
 document.getElementById("divLeaderboard").innerHTML = generateLeaderboardTable();
+

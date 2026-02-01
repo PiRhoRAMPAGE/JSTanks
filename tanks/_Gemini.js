@@ -13,7 +13,6 @@ function main(tank, arena) {
 
     // Initialization (same as before, but add history)
     if (tank.iteration === 0) {
-        tank.name = "Gemini's Tank";
         tank.color = "#ffa500";
         tank.fillColor = "#442c00";
         tank.treadColor = "#f4a460";

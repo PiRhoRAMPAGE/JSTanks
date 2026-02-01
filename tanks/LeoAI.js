@@ -61,7 +61,6 @@ function main(tank, arena) {
     };
     
     if (tank.iteration === 0) {
-        tank.name = "LeoAI";
         tank.color = "#556b2f";
         tank.fillColor = "#3b5323";
         tank.treadColor = "#222222";

@@ -1,26 +1,18 @@
-// Tank AI selector functionality
 let selectedTankA;
 let selectedTankB;
+let tankFileA;
+let tankFileB;
 
-// Store references to the tank AI functions
 const tankAIs = {};
 
-// Initialize the tank selectors
 function initTankSelectors() {
-    // Load the "others" tank AIs
     loadTanks();
-
     const selTankA = document.getElementById("selTankA");
     const selTankB = document.getElementById("selTankB");
-
-    // Add event listeners
     selTankA.addEventListener("change", handleTankAChange);
     selTankB.addEventListener("change", handleTankBChange);
-
 }
 
-
-// Add an option to a select element
 function addOption(selectElement, value, text) {
     const option = document.createElement("option");
     option.value = value;
@@ -29,70 +21,89 @@ function addOption(selectElement, value, text) {
 }
 
 function loadTanks() {
-    const tanks = tankList;
+    const tanks = tankList.sort((a, b) => {
+        const aStarts = a.startsWith('_');
+        const bStarts = b.startsWith('_');
+        if (aStarts && !bStarts) return 1;
+        if (!aStarts && bStarts) return -1;
+        return a.localeCompare(b);
+    });
 
     const selTankA = document.getElementById("selTankA");
     const selTankB = document.getElementById("selTankB");
-
     let initTankA = tanks[~~(Math.random() * tanks.length)];
     let initTankB = tanks[~~(Math.random() * tanks.length)];
-    while (initTankA === "manual") {
-        initTankA = tanks[~~(Math.random() * tanks.length)];
+    while (initTankA.startsWith("_")) initTankA = tanks[~~(Math.random() * tanks.length)];
+    while (initTankB.startsWith("_") || initTankB === initTankA) initTankB = tanks[~~(Math.random() * tanks.length)];
+    if (urlParams.has("a")) {
+        initTankA = urlParams.get("a");
     }
-    while (initTankB === "manual") {
-        initTankB = tanks[~~(Math.random() * tanks.length)];
-    }
-    while (initTankA === initTankB) {
-        initTankB = tanks[~~(Math.random() * tanks.length)];
+    if (urlParams.has("b")) {
+        initTankB = urlParams.get("b");
     }
 
-    tanks.forEach((tankName) => {
-        const script = document.createElement("script");
+    tanks.forEach(tankName => {
+        const funcName = tankName.replace(/\s+/g, '_');
+        const displayName = tankName.charAt(0).toUpperCase() + tankName.slice(1);
+
+        addOption(selTankA, funcName, displayName);
+        addOption(selTankB, funcName, displayName);
+
+        const script = document.createElement('script');
         script.src = `./tanks/${tankName}.js`;
         script.onload = () => {
-            const funcName = `${tankName.replace(/\s+/g, '_')}`;
             tankAIs[funcName] = window.main;
-            const displayName = tankName.charAt(0).toUpperCase() + tankName.slice(1);
-            addOption(selTankA, funcName, displayName);
-            addOption(selTankB, funcName, displayName);
             if (tankName === initTankA) {
-                selectedTankAName = tankName;
+                tankFileA = initTankA;
                 selectedTankA = tankAIs[funcName];
-                selTankA.value = tankName;
+                selTankA.value = funcName;
             }
             if (tankName === initTankB) {
-                selectedTankBName = tankName;
+                tankFileB = initTankB;
                 selectedTankB = tankAIs[funcName];
-                selTankB.value = tankName;
+                selTankB.value = funcName;
             }
         };
         document.body.appendChild(script);
     });
-
 }
 
-// Handle tank A selection change
 function handleTankAChange(event) {
-    const selectedValue = event.target.value;
-    selectedTankA = tankAIs[selectedValue];
+    if (event.target.value !== "tournament") {
+        tankFileA = event.target.value;
+        selectedTankA = tankAIs[event.target.value];
+    }
 }
 
-// Handle tank B selection change
 function handleTankBChange(event) {
-    const selectedValue = event.target.value;
-    selectedTankB = tankAIs[selectedValue];
+    if (event.target.value !== "tournament") {
+        tankFileB = event.target.value;
+        selectedTankB = tankAIs[event.target.value];
+    }
 }
 
-// Get the selected tank A AI function
-function getSelectedTankA() {
-    return selectedTankA;
+function getTankFileA() {
+    return tankFileA;
 }
 
-// Get the selected tank B AI function
-function getSelectedTankB() {
-    return selectedTankB;
+function getTankFileB() {
+    return tankFileB;
 }
 
+function getSelectedTankA() { 
+    if (isTournament) {
+        tankFileA = tournamentMatch[tournamentIndex].a;
+        selectedTankA = tankAIs[tankFileA];
+    }
+    return selectedTankA; 
+}
 
-// Initialize the selectors when the DOM is loaded
+function getSelectedTankB() { 
+    if (isTournament) {
+        tankFileB = tournamentMatch[tournamentIndex].b;
+        selectedTankB = tankAIs[tankFileB];
+    }
+    return selectedTankB; 
+}
+
 document.addEventListener("DOMContentLoaded", initTankSelectors);

@@ -1,6 +1,6 @@
 class Missile {
 
-    constructor(owner, id, x, y, aim, energy, maxSize) {
+    constructor(owner, id, x, y, aim, energy) {
         this.owner = owner;
         this.id = id;
         this.x = x;
@@ -20,13 +20,13 @@ class Missile {
             size: this.size,
             hit: false,
             miss: false,
-            iterationFired: this.owner.iteration,
+            iterationFired: this.owner?.iteration || iteration || 0,
         }
 
         // Play the sound
         this.volume = (1 + (Math.min(MAX_MISSILE_SIZE, this.size) / 6) ** 2) / 2;
         this.pitch = 2.05 - (this.volume) ** 2;
-        soundExplosion(this.volume / 2, this.pitch);
+        playSound("pow", this.volume / 2, this.pitch);
     }
     
     update(ctx, arena) {
@@ -35,11 +35,11 @@ class Missile {
             this.explode(ctx, arena);
             return;
         }
-        if (this.energy > 1) {
-            this.energy -= 1;
+        if (this.energy > MISSILE_FLIGHT_COST) {
+            this.energy -= MISSILE_FLIGHT_COST;
         }
         else {
-            this.energy = 1 / Number.MAX_SAFE_INTEGER;
+            this.energy = EPSILON;
         }
         const moveStep = (xAmount, yAmount) => {
             this.x += xAmount;
@@ -110,19 +110,25 @@ class Missile {
                 const dx = tank.x - this.x;
                 const dy = tank.y - this.y;
                 const distance = Math.sqrt(dx ** 2 + dy ** 2);
-                const damage = 1 + ~~this.energy;
+                const damage = 1 + ~~(this.energy * tank.damageMultiplier);
                 const collisionAngle = (Math.atan2(this.y - tank.y, this.x - tank.x) * 180 / Math.PI + 360000) % 360;
                 if (distance < this.size * 2 + tank.size) {
                     tank.missileCollision = {
-                        ownerId: this.owner.id,
+                        ownerId: this.owner.index,
                         angle: collisionAngle,
                         damage: damage
                     };
                     this.owner.missilesFired++;
                     this.owner.missilesHit++;
-                    this.owner.matchScore += Math.max(0, damage) * DAMAGE_DEALT_POINTS;
+                    if (this.owner.matchScore) { // Tank's missiles
+                        this.owner.matchScore += Math.max(0, damage) * DAMAGE_DEALT_POINTS;
+                    } 
+                    else if (this.owner.owner?.matchScore) { // Airplane's missiles.
+                        this.owner.owner.matchScore += Math.max(0, damage) * DAMAGE_DEALT_POINTS;
+                    }
                     tank.energy = Math.max(0, tank.energy - damage);
                     if (tank.energy <= 0) {
+                        tank.explosionDirection = this.aim;
                         tank.state = "exploding";
                     }
                     tank.missileCollisions++;
@@ -147,6 +153,10 @@ class Missile {
                         this.energy -= other.energy;
                         other.state = "exploding";
                         if (!this.hasHit) {
+                            if (showAnimation.checked) {
+                                console.log("Missile intercepted by " + this.owner.name);
+                            }
+                            this.owner.missileInterceptions++;
                             this.owner.missilesHit++;
                             this.hasHit = true;
                         }
@@ -160,6 +170,7 @@ class Missile {
                         }
                     }
                     else if (this.energy === other.energy) {
+                        this.owner.missileInterceptions++;
                         this.state = "exploding";
                         other.state = "exploding";
                     }
@@ -178,7 +189,7 @@ class Missile {
             this.explosionSize = 0;
             this.desiredExplosionSize = this.energy / 20;
             this.energy = 0;
-            soundExplosion(this.volume, this.pitch * 0.75);
+            playSound("pow", this.volume, this.pitch * 0.75);
         }
         this.explosionSize += this.desiredExplosionSize / 5;
         ctx.save();

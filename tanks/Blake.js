@@ -171,7 +171,6 @@ function main(tank, arena) {
   };
 
   if (tank.iteration === 0) {
-    tank.name = "b";
     tank.color = "#0022ff";
     tank.fillColor = "#000066";
     tank.treadColor = "#000000";

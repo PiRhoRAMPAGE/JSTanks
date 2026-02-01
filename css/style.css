@@ -1,3 +1,10 @@
+@font-face {
+    font-family: 'KenneyPixel';
+    src: url('../assets/pixel.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -99,6 +106,26 @@ canvas {
     background-color: transparent;
 }
 #btnStartGame:hover {
+    cursor: pointer;
+}
+
+#halfDivider {
+    margin: auto auto;
+    margin-bottom: 1em;
+}
+
+#btnStartTournament {
+    font-family: "Press Start 2P";
+    font-size: 0.7em;
+    padding-left: 5px;
+    padding-right: 5px;
+    margin-right: 10px;
+    margin-bottom: 10px;
+    color: white;
+    border: none;
+    background-color: transparent;
+}
+#btnStartTournament:hover {
     cursor: pointer;
 }
 
@@ -235,6 +262,68 @@ canvas {
 }
 
 
+/* Leaderboard table */
+#tblLeaderboard {
+    font-family: 'KenneyPixel', sans-serif;
+    font-size: 16px;
+    line-height: 1;
+    image-rendering: pixelated;
+}
+
+.trHeader:hover {
+    background-color: #000000; 
+}
+
+.trHeader td:first-child::before {
+    content: '▶';
+    display: inline-block;
+    margin-right: 1em;
+    font-size: 0.8em;
+    color: #808080;
+    transition: transform 0.2s ease, color 0.2s ease;
+}
+
+th:last-child {
+    text-align: center;
+}
+
+.col-matches {
+    text-align: right;
+    padding-right: 25px !important; 
+    font-variant-numeric: tabular-nums;
+}
+
+td:nth-child(2) {
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+td:nth-child(3) {
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+/* When the row is 'active' (expanded), rotate the arrow */
+.trHeader.active td:first-child::before {
+    transform: rotate(90deg);
+    color: #ffffff;
+}
+
+.child-row {
+    background-color: #1a1a1a;
+}
+
+.child-row td {
+    color: #eeeeee;
+    font-size: 0.9em;
+    border-bottom: 1px solid #202020;
+}
+
+.col-vs-name {
+    padding-left: 2em !important;
+}
+
+
 /* When screen width is greater than height (landscape orientation) */
 @media (min-width: 1px) and (orientation: landscape) {
     body {
@@ -256,6 +345,7 @@ canvas {
     canvas {
         height: 83vh;
         width: auto;
+        image-rendering: pixelated;
     }
 }
 

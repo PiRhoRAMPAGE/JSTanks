@@ -1,8 +1,9 @@
 class Tank {
     
-    constructor(brain, index, x, y, color, bodyAim = Math.random() * 360, gunAim = 0, radarAim = 0) {
+    constructor(file, brain, index, x, y, color, bodyAim = Math.random() * 360, gunAim = 0, radarAim = 0) {
 
         // Things the user can't change
+        this.name = file;
         this.brain = brain; // callback function for bots main function
         this.index = index;
         this.iteration = 0;
@@ -29,19 +30,26 @@ class Tank {
         this.missiles = [];
         this.missilesFired = 0;
         this.missilesHit = 0;
+        this.missileInterceptions = 0;
         this.accuracy = 0;
         this.message = 0;
         this.victoryMessage = "Winner";
+        this.tracks = [];
+        this.motorSound = playSound("motor", 0.01, 0.1, true);
+
+        // For the explosion
+        this.particles = [];
 
         // Powerups
         this.powerup = { type: null, amount: 0, symbol: "" };
+        this.powerupCollected = false;
         this.powerupsCollected = 0;
         this.speedMultiplier = 1;
-        this.gunCoolFactor = 1;
+        this.gunCoolMultiplier = 1;
         this.firePowerMultiplier = 1;
+        this.damageMultiplier = 1;
 
         // Things the user can change
-        this.name = `Tank ${index}`;
         this.color = color;
         this.bodyTurn = 0;
         this.gunTurn = 0;
@@ -65,6 +73,10 @@ class Tank {
             return;
         }
 
+        if (isTournament && gameCount > MAX_MATCHES) {
+            return;
+        }
+
         // Show tank name on first iteration
         if (this.iteration === 1) {
             this.message = this.name;
@@ -77,19 +89,23 @@ class Tank {
         }
         
         // Handle powerups
+        this.damageMultiplier = 1;
+        this.speedMultiplier = 1;
+        this.gunCoolMultiplier = 1;
+        this.firePowerMultiplier = 1;
         if (this.powerup?.amount > 0) {
             this.powerup.amount--;
-            this.speedMultiplier = 1;
-            this.gunCoolFactor = 1;
-            this.firePowerMultiplier = 1;
             if (this.powerup.type === "speed") {
-                this.speedMultiplier = (this.powerup.amount > 0) ? 2 : 1;
+                this.speedMultiplier = 2;
             }
             if (this.powerup.type === "guncool") {
-                this.gunCoolFactor = (this.powerup.amount > 0) ? 2 : 1;
+                this.gunCoolMultiplier = 2;
             }
             if (this.powerup.type === "firepower") {
-                this.firePowerMultiplier = (this.powerup.amount > 0) ? 2 : 1;
+                this.firePowerMultiplier = 2;
+            }
+            if (this.powerup.type === "armor") {
+                this.damageMultiplier = 0.5;
             }
         }
         
@@ -105,7 +121,7 @@ class Tank {
         
         // Handle energy loss from moving
         else {
-            this.energy -= Math.abs(this.speed / 25);
+            this.energy -= Math.abs(this.speed * MOVEMENT_COST_MULTIPLIER);
         }
 
         // Handle low energy
@@ -123,9 +139,55 @@ class Tank {
             return;
         }
 
+        // Initialize damage particles
+        const damageThreshold = MAX_TANK_ENERGY / 2;
+        if (this.state === "alive" && this.energy < damageThreshold) {
+            const damageSeverity = 1 - this.energy / damageThreshold;
+            const emitParticle = Math.random() < Math.min(0.9, damageSeverity * 5);
+            if (emitParticle) {
+                const isSpark = Math.random() < 0.33;
+                this.particles.push({
+                    x: this.x + (Math.random() - 0.5) * this.size * 2,
+                    y: this.y + (Math.random() - 0.5) * this.size * 2,
+                    vx: (isSpark) ? (Math.random() - 0.5) * 8 : (Math.random() - 0.5) * 1,
+                    vy: (isSpark) ? (Math.random() - 0.5) * 8 - 2 : -Math.random() * 2,
+                    life: (isSpark) ? 0.75 : 1.0,
+                    size: (isSpark) ? Math.random() + 1 : Math.random() * 3 + 1,
+                    color: (isSpark) ? "#ffae00" : ["#ffffff", "#aaaaaa"][~~(Math.random() * 2)],
+                    type: (isSpark) ? "spark" : "smoke",
+                });
+            }
+        }
+
+        // Update existing particles
+        this.particles = this.particles.filter(p => {
+            if (p.type === "ripple") {
+                const shrinkRate = (100 - p.delay ** 2 + p.life * 10) * (p.radius / ARENA_WIDTH);
+                p.color = this.powerup.rippleColor;
+                p.radius -= Math.max(1, shrinkRate);
+                p.life -= 0.075;
+                return p.radius > 0;
+            }
+            if (p.type === "smoke") {
+                if (p.life === undefined) return false; 
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 0.02;
+                p.size *= 1.01;
+                return p.life > 0;
+            }
+            if (p.type === "spark") {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.75;
+                p.life -= 0.05;
+                return p.life > 0;
+            }
+        });
+
         // Cool gun down
         if (this.gunHeat > 0) {
-            this.gunHeat -= (10 + 2 * Math.abs(this.speed)) * this.gunCoolFactor;
+            this.gunHeat -= (10 + 2 * Math.abs(this.speed)) * this.gunCoolMultiplier;
             if (this.gunHeat <= 0) {
                 this.gunHeat = 0;
             }
@@ -153,13 +215,48 @@ class Tank {
         this.matchScore += Math.abs(this.speed) * TANK_SPEED_BONUS_POINTS / MAX_ITERATIONS;
         this.x = this.x + this.actualSpeed * Math.cos(this.bodyAim * Math.PI / 180);
         this.y = this.y + this.actualSpeed * Math.sin(this.bodyAim * Math.PI / 180);
-        
+
+        // Update the tanks tread tracks
+        if (Math.abs(this.actualSpeed) > 0.1) {
+            this.tracks.push({
+                x: this.x,
+                y: this.y,
+                angle: this.bodyAim,
+                opacity: 1 
+            });
+            if (this.tracks.length > 100 * Math.abs(this.speed)) {
+                this.tracks.shift();
+            }
+        }
+        this.tracks.forEach(t => t.opacity -= 0.01);
+        this.tracks = this.tracks.filter(t => t.opacity > 0); 
+
         // Handle collision checks
         this.checkForWalls(arena);
         this.checkForTanks(arena);
         this.checkForMissiles(arena);
         this.checkForPowerups(arena);
         
+        if (this.powerupCollected) {
+            // Spawn the ripple particles
+            for (let i = 0; i < 5; i++) {
+                this.particles.push({
+                    x: this.x,
+                    y: this.y,
+                    vx: 0,
+                    vy: 0,
+                    life: 1.0,
+                    delay: i,
+                    radius: ARENA_WIDTH,
+                    color: this.powerup.color || "#ffffff",
+                    type: "ripple"
+                });
+            }
+            if (this.powerup.type === "energy") {
+                this.powerup.color = "#00000000";
+            }
+        }
+
         // Calculate tanks accuracy
         this.accuracy = (this.missilesFired > 0) ? this.missilesHit / this.missilesFired : 0;
 
@@ -168,7 +265,7 @@ class Tank {
             index: this.index,
             score: scores[this.index] + this.matchScore|| 0,
             iteration: this.iteration,
-            name: this.name,
+            name: this.file,
             color: this.color,
             fillColor: this.fillColor,
             treadColor: this.treadColor,
@@ -192,6 +289,7 @@ class Tank {
             radarAim: this.radarAim,
             radarArc: this.radarArc,
             powerup: (this.powerup.amount > 0) ? { type: this.powerup.type, amount: this.powerup.amount, color: this.powerup.color } : false,
+            powerupCollected: this.powerupCollected,
             powerupsCollected: this.powerupsCollected,
             detectedTanks: this.detectedTanks,
             detectedMissiles: this.detectedMissiles,
@@ -257,6 +355,23 @@ class Tank {
 
         }
 
+        // Play motor sound
+        if (this.state === "dead" || this.state === "exploding") {
+            if (this.motorSound) {
+                this.motorSound.pause();
+            }
+            return;
+        }
+        if (this.motorSound) {
+            const speedSquared = this.speed ** 2;
+            const desiredVolume = 0.05 + (speedSquared * 0.1);
+            const volumeDifference = desiredVolume - this.motorSound.volume;
+            if (Math.abs(volumeDifference) > 0) {
+                this.motorSound.volume += volumeDifference / 5;
+                this.motorSound.playbackRate = 0.5 + 1.95 * speedSquared;
+            }
+        }
+        
         try {
             // "Brain" function (gets user defined actions)
             const actions = this.brain(tankData, arenaData);
@@ -280,6 +395,7 @@ class Tank {
             console.error(e);
             showError({ tank: this.name, message: e.message});
         }
+        
     }
     
     
@@ -371,9 +487,6 @@ class Tank {
             else {
                 errors.push("Invalid hexidecimal color code for tank.radarColor");
             }
-        }
-        if (actions.name) {
-            this.name = actions.name.substring(0, 20);
         }
         if (actions.speed || actions.speed === 0) {
             if (!isNaN(actions.speed)) {
@@ -495,12 +608,55 @@ class Tank {
     }
     
     
-    draw(ctx) {
+draw(ctx) {
 
         // Exit conditions
         if (this.state === "dead") return;
+
+        // Draw tank damage and particles
         ctx.save();
-        
+        ctx.translate(arena.width / 2, arena.height / 2);
+        this.particles.forEach(p => {
+            if (p.type === "smoke") {
+                ctx.globalAlpha = p.life / 2;
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x, p.y, p.size, p.size);
+            }
+            else if (p.type === "spark") {
+                ctx.globalAlpha = 1;
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x, p.y, p.size, p.size);
+            }
+            else if (p.type === "ripple") {
+                ctx.save();
+                ctx.beginPath();
+                ctx.globalAlpha = Math.max(0, 1 - p.radius / ARENA_WIDTH) / 2;
+                ctx.arc(this.x, this.y, p.radius, 0, Math.PI * 2);
+                ctx.strokeStyle = p.color;
+                ctx.lineWidth = 20 - p.life * 15;
+                ctx.stroke();
+                ctx.restore();
+            } 
+        });
+        ctx.globalAlpha = 1;
+        ctx.restore();
+
+        // Draw tanks track marks
+        this.tracks.forEach(t => {
+            ctx.save();
+            ctx.translate(arena.width / 2 + t.x, arena.height / 2 + t.y);
+            ctx.rotate(t.angle * Math.PI / 180);            
+            ctx.fillStyle = `rgba(0, 0, 0, ${t.opacity ** (1 / 10)})`;
+            const treadDist = this.size * 2.5; // Width between the two tracks
+            const treadW = this.size * 0.3;
+            const treadL = this.size * 0.1;            
+            ctx.fillRect(-treadL/2, -treadDist / 2, treadL, treadW);
+            ctx.fillRect(-treadL/2, treadDist / 2 - treadW, treadL, treadW);            
+            ctx.restore();
+        });
+
+
+        ctx.save(); 
         ctx.translate(arena.width / 2, arena.height / 2);
         ctx.translate(this.x, this.y);
         ctx.strokeStyle = this.color;
@@ -584,13 +740,28 @@ class Tank {
         // Draw the turret
         ctx.strokeStyle = this.gunColor || this.color;
         ctx.lineWidth = 2;
-        ctx.rotate(this.gunAim * Math.PI / 180);
+        ctx.rotate(this.gunAim * RADIANS);
         const turretLength = this.size * 1.5;
         ctx.beginPath();
         ctx.moveTo(0, 0);
         ctx.lineTo(turretLength, 0);
         ctx.stroke();
         ctx.closePath();
+
+        // Draw muzzle flash
+        if (this.muzzleFlash > 0) {
+            const flashSize = Math.max(3, this.muzzleFlash); // Scale flash size
+            ctx.save();
+            ctx.globalAlpha = 1 - 1 / this.muzzleFlash;
+            ctx.translate(turretLength, 0);
+            ctx.fillStyle = ["#FF4500", "#FFD700", "#FFFFFF"][~~(Math.random() * 3)];
+            ctx.beginPath();
+            ctx.arc(0, 0, flashSize, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+            ctx.restore();            
+            this.muzzleFlash--;
+        }
 
         // Draw the radar as a filled half-circle
         ctx.fillStyle = this.radarColor || this.color;
@@ -616,7 +787,6 @@ class Tank {
             ctx.restore();
         }
     }
-    
 
     explode(ctx, desiredSize = this.size * 2) {
         if (!showAnimation.checked) {
@@ -624,28 +794,92 @@ class Tank {
             this.energy = 0
             return;
         }
-
         if (!this.explosionSize) {
+            playSound("pow", 1, 0.7);
             this.explosionSize = 0;
-            soundExplosion(1, 0.7);
+            let colors = [
+                this.color,
+                this.fillColor,
+                this.treadColor,
+                this.radarColor,
+                this.gunColor,
+            ]
+
+            let biasX = 0, biasY = 0; // bias particles in direction of missile
+            if (this.explosionDirection !== undefined) {
+                biasX = Math.cos(this.explosionDirection * Math.PI / 180) * desiredSize;
+                biasY = Math.sin(this.explosionDirection * Math.PI / 180) * desiredSize;
+            }
+
+            this.particles = []; // Empty particle array
+            for (let i = 0; i < 24; i++) {
+                let particleSize = Math.random() * 3;
+                let randomAngle = Math.random() * Math.PI * 2;
+                let randomSpeed = (0.1 + Math.random() * 0.5) * this.size * (6 - particleSize);
+                this.particles.push({
+                    x: 0, y: 0,
+                    vx: (Math.cos(randomAngle) * randomSpeed) + biasX,
+                    vy: (Math.sin(randomAngle) * randomSpeed) + biasY,
+                    angle: Math.random() * Math.PI * 2,
+                    spin: (Math.random() - 0.5) * 0.2,
+                    size: particleSize,
+                    color: colors[~~((Math.random() ** 2) * colors.length)] 
+                });
+                const isSpark = Math.random() < 0.33;
+                if (isSpark) {
+                    this.particles.push({
+                        x: this.x + (Math.random() - 0.5) * this.size * 2,
+                        y: this.y + (Math.random() - 0.5) * this.size * 2,
+                        vx: (isSpark) ? (Math.random() - 0.5) * 8 : (Math.random() - 0.5) * 1,
+                        vy: (isSpark) ? (Math.random() - 0.5) * 8 - 2 : -Math.random() * 2,
+                        life: (isSpark) ? 0.75 : 1.0,
+                        size: (isSpark) ? Math.random() + 1 : Math.random() * 3 + 1,
+                        color: (isSpark) ? "#ffae00" : ["#ffffff", "#aaaaaa"][~~(Math.random() * 2)],
+                        type: (isSpark) ? "spark" : "smoke",
+                    });
+                }
+            }
         }
-        this.explosionSize += 2;
+
         ctx.save();
-        ctx.translate(arena.width / 2, arena.height / 2);
-        ctx.translate(this.x, this.y);
-        ctx.rotate(this.bodyAim * Math.PI / 180);
+        ctx.translate(arena.width / 2 + this.x, arena.height / 2 + this.y);
+
+        const blastColor = ["#FF4500", "#FFD700", "#FFFFFF"][~~(Math.random() * 3)];
+        this.explosionSize += 2;
+
+        // Draw a flash that covers the screen
+        ctx.save();
+        ctx.globalAlpha = Math.random() / 2;
+        ctx.fillStyle = blastColor;
+        ctx.fillRect(-arena.width, -arena.height, arena.width * 2, arena.height * 2);
+        ctx.restore();
+
+        // Draw particles of the tank flying away
+        this.particles.forEach(p => {
+            p.x += p.vx;
+            p.y += p.vy;
+            p.angle += p.spin;
+            p.size *= 0.95;
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.angle);
+            ctx.fillStyle = p.color;
+            ctx.fillRect(-1, -1, p.size, p.size);
+            ctx.restore();
+        });
+
+        // Draw the actual explosion
         ctx.beginPath();
         ctx.arc(0, 0, this.explosionSize, 0, Math.PI * 2);
-        ctx.fillStyle = ["red", "orange", "yellow", "white"][~~(Math.random() * 4)];
+        ctx.fillStyle = blastColor;
         ctx.fill();
-        ctx.closePath();
         ctx.restore();
+
+        // Kill tank
         if (this.explosionSize >= desiredSize) {
             this.state = "dead";
-            this.energy = 0;
         }
     }
-
 
     
     checkForWalls(arena) {
@@ -690,10 +924,11 @@ class Tank {
             const multiplier = Math.abs(Math.cos(collisionAngle * Math.PI / 180));
     
             // Calculate the kinetic energy of your tank
-            const kineticEnergy = (this.size * Math.abs(this.actualSpeed)) ** 2;
+            const mySpeed = Math.abs(this.speed) * (1 + (this.powerup.type === "speed"));
+            const kineticEnergy = Math.min(MAX_COLLISION_DAMAGE, 0.5 * MAX_COLLISION_DAMAGE * mySpeed ** 2);
 
             // Calculate the total damage done by the collision
-            const damage = ~~(kineticEnergy * multiplier + 1);
+            const damage = ~~(kineticEnergy * multiplier) * this.damageMultiplier;
 
             // Deduct the damage from the tanks energy
             this.energy = Math.max(0, this.energy - damage);
@@ -702,6 +937,7 @@ class Tank {
             this.message = -damage;
             this.showMessage = 50;
             
+            // Blow up dead tanks
             if (this.energy <= 0) {
                 this.state = "exploding";
             }
@@ -801,7 +1037,7 @@ class Tank {
                         aim: (other.aim + 36000) % 360,
                         speed: other.speed / 10,
                         actualSpeed: other.speed,
-                        ownersIndex: other.owner.index,
+                        ownerIndex: other.owner.index,
                     });
                     this.detectedMissiles.sort((a, b) => {
                         return a.distance - b.distance;
@@ -812,6 +1048,7 @@ class Tank {
     }
 
     checkForPowerups(arena) {
+        this.powerupCollected = false;
         this.detectedPowerups = [];
         const radarDirection = (this.radarAim + this.bodyAim + this.gunAim + 360000) % 360; // Radar direction in degrees (normalized)
     
@@ -851,6 +1088,7 @@ class Tank {
                 // Check if powerup is close enough to collect
                 if (distance < other.size + this.size * 2) {
                     other.collect(this);
+                    this.powerupCollected = true;
                 }
             }
         });
@@ -865,8 +1103,10 @@ class Tank {
         const collisionAngle = Math.atan2(dy, dx) * 180 / Math.PI;
 
         // Calculate relative velocity
-        const relativeVelocityX = (this.actualSpeed * Math.cos(this.bodyAim * Math.PI / 180)) - (other.speed * Math.cos(other.bodyAim * Math.PI / 180));
-        const relativeVelocityY = (this.actualSpeed * Math.sin(this.bodyAim * Math.PI / 180)) - (other.speed * Math.sin(other.bodyAim * Math.PI / 180));
+        const mySpeed = Math.abs(this.speed) * (1 + (this.powerup.type === "speed"));
+        const otherSpeed = Math.abs(other.speed) * (1 + (other.powerup.type === "speed"))
+        const relativeVelocityX = (mySpeed * Math.cos(this.bodyAim * Math.PI / 180)) - (otherSpeed * Math.cos(other.bodyAim * Math.PI / 180));
+        const relativeVelocityY = (mySpeed * Math.sin(this.bodyAim * Math.PI / 180)) - (otherSpeed * Math.sin(other.bodyAim * Math.PI / 180));
         const relativeSpeed = Math.sqrt(relativeVelocityX ** 2 + relativeVelocityY ** 2);
 
         // Calculate multiplier based on collision angle
@@ -875,7 +1115,7 @@ class Tank {
         const multiplier = Math.abs(Math.cos(normalizedAngleDifference * Math.PI / 180));
 
         // Calculate kinetic energy
-        const kineticEnergy = (this.size * relativeSpeed) ** 2;
+        const kineticEnergy = Math.min(MAX_COLLISION_DAMAGE, 0.5 * MAX_COLLISION_DAMAGE * relativeSpeed ** 2);
         
         // Calculate damage
         const damage = (kineticEnergy * multiplier) / 2; // Divide the damage between the tanks
@@ -885,7 +1125,7 @@ class Tank {
         other.matchScore += Math.abs(Math.min(damage / 2, this.energy)) * DAMAGE_DEALT_POINTS;
 
         // Apply damage to both tanks
-        this.energy = Math.max(0, this.energy - damage / 2);
+        this.energy = Math.max(0, this.energy - (damage / 2) * this.damageMultiplier);
         other.energy = Math.max(0, other.energy - damage / 2);
 
         // Save the collision data
@@ -900,11 +1140,11 @@ class Tank {
         other.tankCollisions++;
 
         // Set the timer to show the tanks damage
-        this.message = ~~(damage * -1);
-        this.showMessage = 50;
-        other.message = ~~(damage * -1);
-        other.showMessage = 50;
-
+        if (damage) {
+            this.message = ~~(damage * -2 * this.damageMultiplier);
+            this.showMessage = 50;
+        }
+        
         // Check for death
         if (this.energy <= 0) {
             this.state = "exploding";
@@ -913,7 +1153,7 @@ class Tank {
             other.state = "exploding";
         }
 
-        //Resolve collision, prevent tanks from overlapping.
+        // Resolve collision, prevent tanks from overlapping.
         const distanceBetweenTanks = Math.sqrt((this.x - other.x) ** 2 + (this.y - other.y) ** 2);
         const overlap = (this.size + other.size) - distanceBetweenTanks;
         if (overlap > 0){
@@ -943,16 +1183,22 @@ class Tank {
         // Cap the amount of energy per shot to MAX_MISSILE_ENERGY
         if (energy >= MAX_MISSILE_ENERGY) energy = MAX_MISSILE_ENERGY;
         
+        // Don't let tank's fire missiles they can't afford
+        if (energy > this.energy / 2) energy = this.energy / 2;
+
         // Deduct the energy
         this.energy -= energy;
         
         // Increase the gun heat
-        this.gunHeat += Math.min(MAX_GUN_HEAT, energy * GUN_HEAT_MULTIPLIER / this.gunCoolFactor);
+        this.gunHeat += Math.min(MAX_GUN_HEAT, energy * GUN_HEAT_MULTIPLIER / this.gunCoolMultiplier);
         
         // Create the missile
         const missileEnergy = energy * MISSILE_ENERGY_MULTIPLIER * this.firePowerMultiplier * (1 - this.handicap);
         const missile = new Missile(this, this.missilesFired, this.x, this.y, this.bodyAim + this.gunAim, missileEnergy, this.size / 2);
         arena.missiles.push(missile);
+
+        // Set up the muzzle flash
+        this.muzzleFlash = Math.max(0.5, energy / 10);
 
         return this.missilesFired || false;
     }

@@ -30,7 +30,6 @@ function main(tank, arena) {
     // This code runs only once when our tank first enters the arena.
 
     if (tank.iteration === 0) {
-        tank.name = "ExampleTank"; // Gives our tank a name.
         tank.color = "#00ff00";    // Sets the color of our tank to green.
         tank.radarArc = 1;         // Sets the width of our radar sweep (how much it can see).
         tank.gunTurn = tank.angleTo(0, 0) / 180; // Initially points the gun towards the center of the arena.

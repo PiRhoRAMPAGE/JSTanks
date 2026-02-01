@@ -1,16 +1,3 @@
-/*
-
-Rampage	        91.75%	400
-vs. b		    90.00%	100
-vs. Kektank		89.00%	100
-vs. Q-Learner	97.00%	100
-vs. LeoAI		91.00%	100
-
-Each tank was ran 50 matches as tank A and 50 as tank B
-
-*/
-
-
 
 function main(tank, arena) {
     const LEARNING_ENABLED = false;
@@ -80,7 +67,6 @@ function main(tank, arena) {
         let predictedTankY = tank.y;
         let currentTankSpeed = tank.actualSpeed;
         let predictedBodyAim = tank.bodyAim;
-    
         for (let i = 0; i < PREDICTION_STEPS; i++) {
             predictedMissileX += MISSILE_SPEED * Math.cos(missile.aim * DEGREES);
             predictedMissileY += MISSILE_SPEED * Math.sin(missile.aim * DEGREES);
@@ -105,7 +91,6 @@ function main(tank, arena) {
     
     // Set initial values
     if (tank.iteration === 0) {
-        tank.name = "Rampage";
         tank.color = "#c80000";
         tank.fillColor = "#000000";
         tank.treadColor = "#df0000";
@@ -168,8 +153,8 @@ function main(tank, arena) {
 
 
     // Calculate distances to each wall
-    let wallDistance = Infinity;
     let wallAngle = 0;
+    let wallDistance = Infinity;
     const leftWallDistance = Math.abs(-arena.width / 2 - tank.x);
     const rightWallDistance = Math.abs(arena.width / 2 - tank.x);
     const topWallDistance = Math.abs(-arena.height / 2 - tank.y);
@@ -781,5 +766,4 @@ function main(tank, arena) {
     // This function must return the tank object
     return tank;
 
-    
 }

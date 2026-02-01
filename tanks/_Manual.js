@@ -2,15 +2,10 @@ function main(tank, arena) {
 
     // Initialize retained data
     if (tank.iteration === 0) {
-        tank.name = "Manual";
         tank.color = "#ffffff";
         tank.fillColor = "#000000";
         tank.retained.gunCharge = 0;
         tank.retained.controllerConnected = false;
-        if (gameCount === 1) {
-            const name = prompt("Enter a name for your tank", "Manual");
-            tank.name = name || "Manual";
-        }
     }
 
     // Accessing the objects in the global scope is cheating

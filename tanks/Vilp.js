@@ -134,7 +134,6 @@ function main(e, t) {
       (e.bodyTurn = 0),
       (e.gunTurn = 0),
       (e.radarArc = 0.99),
-      (e.name = "Kektank"),
       (e.victoryMessage = "Tank u come again!"),
       (e.color = "#25faa1"),
       (e.fillColor = "#000000"),

@@ -12,6 +12,26 @@ Math.sin = (angle) => {
 };
 
 
+const getDistance = (x1, y1, x2, y2) => {
+    return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+};
+
+const getAngle = (x1, y1, x2, y2) => {
+    return Math.atan2(y2 - y1, x2 - x1) * DEGREES;
+};
+
+const lerp = (a, b, lerpFactor) => {
+    return a * (1 - lerpFactor) + b * lerpFactor;
+};
+
+const normalizeAngle = (angle) => {
+    angle %= 360;
+    if (angle > 180) angle -= 360;
+    if (angle < -180) angle += 360;
+    return angle;
+};
+
+
 const COS_TABLE_SIZE = SIN_TABLE_SIZE;
 const COS_LOOKUP = new Array(COS_TABLE_SIZE);
 for (let i = 0; i < COS_TABLE_SIZE; i++) {

@@ -1,5 +1,6 @@
 # JS Tanks - Coding Challenge (README)
 
+
 ## Creating a Tank
 
 - Decide a name for your tank (tankname).
@@ -7,17 +8,17 @@
 - Create a JavaScript (.js) file in the `/tanks` directory with the same name as your tank (tankname.js).
 - Implement your tanks logic in the `main` function of the JavaScript file you created.
 - The `main` function accepts `tank` and `arena` objects as arguments and must return the modified `tank` object.
-- Avoid writing code outside of the `main` function to prevent global scope issues. Use `tank.retained` for persistent data.
-- See `/tanks/example.js` for help.
-
+- Avoid writing code outside of the `main` function to prevent global scope issues. Use `tank.retained` for persistent data. `tank.retained` is cleared between matches.
+- See `/tanks/_example.js` for help.
+- NOTE: Starting your tank name with an underscore (_) will make it appear at the bottom of the tank selection list, not be included in tournaments, and never be selected as one of the default tanks.
 
 
 ## Energy Usage
 
 - Colliding with a wall results in energy loss determined by your `actualSpeed` and the angle of impact.
 - Colliding with another tank results in energy loss determined by the combined `actualSpeed` of both tanks and the angle of impact.
-- Moving consumes energy at a rate of `Math.abs(tank.speed) / 10` units per iteration.
-- Calling `tank.fire(energy)` will deduct the specified energy from your tank. The missile fired will start with an energy level that is four times the deducted amount.
+- Moving consumes energy at a rate of `Math.abs(tank.speed) * MOVEMENT_COST_MULTIPLIER` units per iteration.
+- Calling `tank.fire(energy)` will deduct the specified energy from your tank. The missile fired will start with an energy level that is `MISSILE_ENERGY_MULTIPLIER` times the deducted amount.
 - If your tank is struck by a missile, the amount of energy you lose is equivalent to the energy the missile had left at the moment of impact.
 
 
@@ -44,23 +45,28 @@ the challenge. For fair play, limit your code's interaction exclusively to the p
 | `MIN_Y`                          | Number       | The minimum possible y-coordinate (equal to `-ARENA_HEIGHT / 2`).
 | `MAX_Y`                          | Number       | The maximum possible y-coordinate (equal to `ARENA_HEIGHT / 2`).
 | `TANK_SIZE`                      | Number       | The size of your tank (radius).
-| `TANK_MAX_ENERGY`                | Number       | The maximum possible energy for tanks.
+| `MAX_TANK_ENERGY`                | Number       | The maximum possible energy for tanks.
 | `MAX_ACTUAL_SPEED`               | Number       | The maximum actual speed for tanks.
 | `MAX_BODY_TURN_DEGREES`          | Number       | The maximum amount of body turning rotation per iteration (degrees).
 | `MAX_GUN_TURN_DEGREES`           | Number       | The maximum amount of gun turning rotation per iteration (degrees).
 | `MAX_RADAR_TURN_DEGREES`         | Number       | The maximum amount of radar turning rotation per iteration (degrees).
-| `MAX_RADAR_ARC_DEGREES`          | Number       | The width of the radars arc (degrees).
+| `MAX_RADAR_ARC_DEGREES`          | Number       | The maximum width of the radars arc (degrees).
+| `MAX_COLLISION_DAMAGE`           | Number       | The maximum amount of damage that can be caused by a collision with a tank or wall.
+| `MAX_MISSILE_ENERGY`             | Number       | The maximum possible energy for missiles.
+| `MISSILE_FLIGHT_COST`            | Number       | The amount of energy it cost for a missile to move per iteration.
 | `MISSILE_SPEED`                  | Number       | The speed at which missiles travel.
-| `MISSILE_MAX_ENERGY`             | Number       | The maximum possible energy for missiles.
 | `MISSILE_MIN_SIZE`               | Number       | The minimum size for missiles.
 | `MISSILE_MAX_SIZE`               | Number       | The maximum size for missiles (equal to `TANK_SIZE / 10`).
-| `PI`                             | Number       | Equal to `Math.PI` (3.141592653589793)
+| `PI`                             | Number       | Equal to `Math.PI` (3.141592653589793).
+| `EPSILON`                        | Number       | The smallest non-zero number (equal to `1 / Number.MAX_SAFE_INTEGER`).
 | `DEGREES`                        | Number       | The conversion factor for converting radians to degrees (equal to `180 / Math.PI`).
 | `RADIANS`                        | Number       | The conversion factor for converting degrees to radians (equal to `Math.PI / 180`).
+| `MAX_MATCHES`                    | Number       | The maximum number of matches a game can run for.
 | `MAX_ITERATIONS`                 | Number       | The maximum number of iterations a match can run for.
 | `DAMAGE_DEALT_POINTS`            | Number       | The amount of points awarded for for damage your tank deals to other tanks (this amount is multiplied by the damage dealt at every shot).
 | `SURVIVAL_BONUS_POINTS`          | Number       | The amount of bonus points awarded to the winner of the match for survival (this amount is multiplied by the winner's remaining energy at the end of the match).
 | `ACCURACY_BONUS_POINTS`          | Number       | The amount of bonus points awarded to the winner of the match for accuracy (this amount is multiplied by the winner's accuracy percentage at the end of the match).
+| `MOVEMENT_COST_MULTIPLIER`       | Number       | The multiplier for the energy cost of movement.
 | `TANK_SPEED_BONUS_POINTS`        | Number       | The amount of points awarded for for absolute speed of your tank (this amount is multiplied by the absolute value of the speed of your tank during every iteration).
 | `MISSILE_ENERGY_MULTIPLIER`      | Number       | The multiplier for missile energy.
 | `GUN_HEAT_MULTIPLIER`            | Number       | The multiplier for `gunHeat` for tanks.
@@ -80,10 +86,11 @@ the challenge. For fair play, limit your code's interaction exclusively to the p
 | `arena.tanksRemaining`           | Number       | The number of tanks still active in the match.
 | `arena.gameCount`                | Number       | The current match number.
 | `arena.gameSpeed`                | Number       | The currently selected game speed specified in game settings
-| `arena.animate`                  | Number       | `true` if animations are enabled in game settings, false otherwise.
-| `arena.sound`                    | Number       | `true` if sound is enabled in game settings, false otherwise.
-| `arena.missileInterception`      | Boolean      | `true` if game settings allow intercepting missiles, `false` otherwise.
+| `arena.animate`                  | Boolean      | `true` if animations are enabled in game settings, false otherwise.
+| `arena.sound`                    | Boolean      | `true` if sound is enabled in game settings, false otherwise.
+| `arena.missileInterception`      | Boolean      | `true` if game settings allow intercepting missiles, `false` otherwise. Colliding missiles reduce energy on a 1:1 basis. Any missile reduced to zero energy is removed from the arena (The missile the with most energy survives the collision). 
 | `arena.powerupsSpawned`          | Number       | The total number of powerups spawned in the arena during this match.
+| `tank.name`                      | String       | The name of your tank (tank file name).
 | `tank.index`                     | Number       | Your tank's unique identifier in the current match.
 | `tank.state`                     | String       | The current status of your tank.
 | `tank.size`                      | Number       | The physical size (radius) of your tank.
@@ -98,13 +105,14 @@ the challenge. For fair play, limit your code's interaction exclusively to the p
 | `tank.gunAim`                    | Number       | The current angle of your turret relative to your tank's body (degrees, relative).
 | `tank.gunHeat`                   | Number       | The current heat level of your gun (cannot fire if `tank.gunHeat > 0`).
 | `tank.radarAim`                  | Number       | The current angle of your radar relative to your tank's body and gun (degrees, relative).
+| `tank.powerupCollected`          | Boolean      | True if a power up was collected this iteration.
 | `tank.powerupsCollected`         | Number       | The current number of powerups your tank has collected during this match.
 | `tank.powerup`                   | Object/False | Data about your tanks current powerup.
 |    - `type`                      | String       | The type of powerup you currently have
 |    - `amount`                    | Number       | The amount of the powerup you currently have
 | `tank.tankCollision`             | Object/False | Data about a collision with another tank, or `false` if no collision.
 |    - `id`                        | Number       | The `id` of the tank you collided with.
-|    - `angle`                     | Number       | The angle to the collision.
+|    - `angle`                     | Number       | The angle to the collision (absolute, in degrees).
 |    - `damage`                    | Number       | The amount of damage sustained in the collision.
 | `tank.missileCollision`          | Object/False | Data about a collision with a missile, or `false` if no collision.
 |    - `ownerId`                   | Number       | The `id` of the tank that fired the missile you collided with.
@@ -122,8 +130,9 @@ the challenge. For fair play, limit your code's interaction exclusively to the p
 |    - `size`                      | Number       | The physical size (radius) of the specified missile.
 |    - `miss`                      | Boolean      | `true` if the specified missile has hit a wall or ran out of energy, `false` otherwise.
 |    - `hit`                       | Boolean      | `true` if the specified missile has hit a tank, `false` otherwise.
-| `tank.detectedTanks[index]`      | Array        | Data about a mtank detected by your radar at the given `index` (sorted by distance).
+| `tank.detectedTanks[index]`      | Array        | Data about a tank detected by your radar at the given `index` (sorted by distance).
 |    - `index`                     | Number       | The index of the detected tank.
+|    - `file`                      | String       | The file name of the detected tank.
 |    - `name`                      | String       | The name of the detected tank.
 |    - `energy`                    | Number       | The amount of energy the detected tank has remaining.
 |    - `gunHeat`                   | Number       | The current heat level of the detected tank's gun.
@@ -150,13 +159,13 @@ the challenge. For fair play, limit your code's interaction exclusively to the p
 |    - `aim`                       | Number       | The current aim angle of the detected missile (in degrees, absolute).
 |    - `speed`                     | Number       | The speed controller for the detected missile (normalized, will always be `1`).
 |    - `actualSpeed`               | Number       | The actual speed of the detected missile (will always be `MISSILE_SPEED`).
-|    - `ownersIndex`               | Number       | The index of the tank that fired the detected missile.
+|    - `ownerIndex`                | Number       | The index of the tank that fired the detected missile.
 | `tank.detectedPowerups[index]`   | Array        | Data about a powerup detected by your radar at the given `index` (sorted by distance).
+|    - `type`                      | String       | The type of powerup.
 |    - `amount`                    | Number       | The amount of this powerup.
-|    - `type`                      | Number       | The type of powerup.
-|    - `angleTo`                   | Number       | The angle (in degrees) from your tank to the detected missile.
-|    - `distance`                  | Number       | The distance between your tank and the detected missile.
-|    - `duration`                  | Number       | The duration in intervals until this powerup disapears from the screen.
+|    - `angleTo`                   | Number       | The angle (in degrees) from your tank to the detected powerup.
+|    - `distance`                  | Number       | The distance between your tank and the detected powerup.
+|    - `duration`                  | Number       | The duration in intervals until this powerup disappears from the screen.
 |    - `x`                         | Number       | The current x-coordinate of the detected powerup in the arena.
 |    - `y`                         | Number       | The current y-coordinate of the detected powerup in the arena.
 
@@ -166,8 +175,7 @@ the challenge. For fair play, limit your code's interaction exclusively to the p
 
 | Property Name                    | Data Type    | Acceptable Value       | Default Value | Description
 | -------------------------------- | ------------ | ---------------------- | ------------- | -----------------------------------------------------------------------------------------------------------------------------------------------------
-| `tank.name`                      | String       | Max Length: 20         | "Unnamed"     | The name of your tank.
-| `tank.message`                   | String       | Max Length: 64         | ""            | A nessage to be displayed above your tank during the match.
+| `tank.message`                   | String       | Max Length: 64         | ""            | A message to be displayed above your tank during the match.
 | `tank.victoryMessage`            | String       | Max Length: 64         | "Winner"      | A message displayed above your tank when it wins.
 | `tank.color`                     | String       | Hexadecimal Code       | "#000000"     | The outline color of your tank's body.
 | `tank.fillColor`                 | String       | Hexadecimal Code       | "#FFFFFF"     | The fill color of your tank's body.
@@ -176,10 +184,10 @@ the challenge. For fair play, limit your code's interaction exclusively to the p
 | `tank.radarColor`                | String       | Hexadecimal Code       | "#00FFFF"     | The color of your tank's radar.
 | `tank.speed`                     | Number       | -1 to 1                | 0             | The desired speed of your tank, where `-1` is full reverse, `0` is stop, and `1` is full forward. The actual speed is determined by `tank.speed * MAX_ACTUAL_SPEED`.
 | `tank.bodyTurn`                  | Number       | -1 to 1                | 0             | How much to turn the tank's body per iteration (`-1` = `MAX_BODY_TURN_DEGREES` left, `0` no turn, `1` = `MAX_BODY_TURN_DEGREES` right).
-| `tank.gunTurn`                   | Number       | -1 to 1                | 0             | How much to turn the tank's turret relative to the body per iteration (`-1` = `MAX_GUN_TURN_DEGREES` left, `0` no turn, `1` = `MAX_GUN_TURN_DEGREES` right)..
+| `tank.gunTurn`                   | Number       | -1 to 1                | 0             | How much to turn the tank's turret relative to the body per iteration (`-1` = `MAX_GUN_TURN_DEGREES` left, `0` no turn, `1` = `MAX_GUN_TURN_DEGREES` right).
 | `tank.radarTurn`                 | Number       | -1 to 1                | 0             | How much to turn the radar relative to the body and gun per iteration (`-1` = `MAX_RADAR_TURN_DEGREES` left, `0` no turn, `1` = `MAX_RADAR_TURN_DEGREES` right).
-| `tank.radarArc`                  | Number       | 0 to 1                 | 1             | The width of your radar's scanning arc (`0` = 0 degrees, `1` = `MAX_RADAR_ARC_DEGREES` degrees).
-| `tank.handicap`                  | Number       | 0 to 1                 | 0             | An optional handicap (`0` full damage, `1` no damage). Higher values reduce damage dealt to targets.
+| `tank.radarArc`                  | Number       | 0 to 1                 | 1             | The width of your radar's scanning arc (`0` = 0 degrees, `1` = `MAX_RADAR_ARC_DEGREES` degrees, the radar is centered on the `radarAim`, and the tank detects everything inside of the `radarArc` instantly).
+| `tank.handicap`                  | Number       | 0 to 1                 | 0             | An optional handicap (`0` full damage, `0.5` half damage, `1` no damage). Higher values reduce damage dealt to targets.
 | `tank.retained`                  | JSON Object  | Any Valid JSON         | {}            | An empty JSON object for storing persistent data across iterations.
 | `tank.indicator`                 | Object       | Expected Properties    | {}            | An object containing the color and intensity values for your tanks indicator light.
 |    - `color`                     | String       | Hexadecimal Code       | "#00FF00"     | The color of your tanks indicator light
@@ -193,27 +201,62 @@ the challenge. For fair play, limit your code's interaction exclusively to the p
 | -------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 | `tank.angleTo(x, y)`             | Number       | Returns the angle from your tank to the specified `x` and `y` coordinates.
 | `tank.angleFrom(x, y)`           | Number       | Returns the angle the specified `x` and `y` coordinates to your tank.
-| `tank.distanceTo(x, y)`          | Number       | Returns the distance your tank to the specified `x` and `y` coordinates.
-| `tank.fire(energy)`              | Number       | Fires a missile with the specified `energy`. The missile energy is limited `MAX_MISSILE_ENERGY`. Can not fire if `tank.gunHeat > 0` Returns `id` of fired missile (used as a key for `tank.missiles`).
+| `tank.distanceTo(x, y)`          | Number       | Returns the distance from your tank to the specified `x` and `y` coordinates.
+| `tank.fire(energy)`              | Number       | Fires a missile with the specified `energy` multiplied times `MISSILE_ENERGY_MULTIPLIER`. The missile energy is limited `MAX_MISSILE_ENERGY`. Can not fire if `tank.gunHeat > 0` Returns `id` of fired missile (used as an index for `tank.missiles`). Missiles lose `MISSILE_FLIGHT_COST` units of energy per iteration.
 
 
 ## Arena Methods
 
 | Method Name                      | Returns      | Description
 | -------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-| `nearestWallAngle(x, y)`         | Number       | Returns the angle to the nearest wall (degrees, absolute)
-| `nearestWallDistance(x, y)`      | Number       | Returns the distance to the nearest wall
-| `contains(x, y, margin = 0)`     | Boolean      | `true` if the specified point is within the margins of the arena, `false` otherwise.
+| `arena.nearestWallAngle(x, y)`   | Number       | Returns the angle to the nearest wall (degrees, absolute)
+| `arena.nearestWallDistance(x, y)`| Number       | Returns the distance to the nearest wall
+| `arena.contains(x, y, margin)`   | Boolean      | `true` if the specified point is within the margins of the arena, `false` otherwise.
 
 
 ## Powerups
 
-| Powerup Name                     | Returns      | Description
-| -------------------------------- | ------------64 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-| `energy`                         | N/A          | Increases your tank's energy by the specified amount. (🔋)
-| `speed`                          | N/A          | Doubles the number of iterations your tank gets per frame. (⚡️)
-| `firepower`                      | N/A          | Doubles the energy of missiles fired by your tank. (🔥)
-| `guncool`                        | N/A          | Decreases gunheat by half and doubles the guns rate of cooling. (❄️)
+| Powerup Name    | Icon           | Returns      | Description
+| -------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+| `armor`         | 🛡️             | N/A          | Reduces damage taken by missiles and collisions by 50%.
+| `energy`        | 🔋             | N/A          | Increases your tank's energy by the specified amount. 
+| `speed`         | ⚡️             | N/A          | Doubles the number of iterations your tank gets per frame.
+| `guncool`       | ❄️             | N/A          | Decreases gunheat by half and doubles the guns rate of cooling. 
+| `firepower`     | 🔥             | N/A          | Doubles the energy of missiles fired by your tank (energy becomes `energy * 2 * MISSILE_ENERGY_MULTIPLIER`). 
+| `airstrike`     | ✈             | N/A          | Calls in a support aircraft to fly over the arena and fire missiles at the enemy tank.
 
 
+## Math Functions (some common functions)
+| Function Name                    | Returns      | Description
+| -------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+| `lerp(a, b, lerpFactor)`         | Number       | Performs a linear interpolation from `a` to `b`.
+| `getAngle(x1, y1, x2, y2)`       | Number       | Returns the angle (in degrees) to between two specified points
+| `getDistance(x1, y1, x2, y2)`    | Number       | Returns the distance to between two specified points
+| `normalizeAngle(angle)`          | Number       | Returns the angle (in degrees) normalized from -180 degrees to 180 degrees.
 
+
+## URL Parameters
+| URL Parameter                    | Data Type    | Description
+| -------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+| `a`                              | String       | The file name for the default tank A (case sensitive, omit the .js).
+| `b`                              | String       | The file name for the default tank B (case sensitive, omit the .js).
+| `matches`                        | Number       | The maximum number of matches to allow this game to run.
+| `pspawn`                         | Number       | The probability of spawning a pickup on any iteration (`0` to `1`, default is `0.002`)
+| `start`                          | N/A          | If included the game will automatically start with the default tanks.
+| `headless`                       | N/A          | If included animations will be disabled be default.
+| `tournament`                     | N/A          | If included the game will run a round robin tournament (not including tanks who's name begin with an underscore).
+
+
+## Change Log
+
+- Added `MAX_MATCHES` constant to reload page after specified number of matches.
+- Added URL parameters for tank selection, max matches, and headless mode.
+- Added muzzel flash when tanks fire.
+- Added smoke and sparks particle effect for damaged tanks.
+- Added tank debris particle effect, and screen flash for exploding tanks.
+- Changed `tank.name` so that it is a read only value (the file name of the bot).
+- Added `tank.powerupCollected` boolean (true if a power up was collected during this iteration).
+- Added URL parameters for powerup spawn rate, auto-start, and tournament mode.
+- Added `armor` and `airstrike` powerups.
+- Added sounds for tank's, airplanes, and powerup collection.
+- Changed `sounds.js` to use a library of cached sounds, instead of creating a new one every time.
