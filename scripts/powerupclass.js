@@ -1,5 +1,5 @@
 
-function spawnPowerup(powerupType) {
+function spawnPowerup(powerupType, amount, x, y) {
     if (arena.powerups.length > 0) return;
     const options = [
         { type: "armor", amount: MAX_POWERUP_AMOUNT },
@@ -12,22 +12,22 @@ function spawnPowerup(powerupType) {
     const numAvailable = (arena.airplanes.length > 0) ? 4 : 5;
     const selectedIndex = (typeof powerupType === "number") ? powerupType : ~~(Math.random() * numAvailable);
     const selectedPowerup = options[selectedIndex];
-    let powerup = new PowerUp(selectedPowerup.type, selectedPowerup.amount)
-    powerup.amount = Math.max(MIN_POWERUP_AMOUNT, MAX_POWERUP_AMOUNT * Math.random());
+    const powerupAmount = amount || Math.max(MIN_POWERUP_AMOUNT, MAX_POWERUP_AMOUNT * Math.random());
+    let powerup = new PowerUp(selectedPowerup.type, powerupAmount, x, y);
     powerupsSpawned++;
     arena.powerups.push(powerup);
 }
 
 class PowerUp {
-    constructor(type, amount) {
+    constructor(type, amount, x, y) {
         this.type = type;
         this.amount = amount;
         this.state = "active";
         this.size = TANK_SIZE;
         this.duration = POWERUP_PICKUP_DURATION;
         const margin = this.size * 5;
-        this.x = (-ARENA_WIDTH / 2 + margin) + (Math.random() * ARENA_WIDTH - margin * 2);
-        this.y = (-ARENA_HEIGHT / 2 + margin) + (Math.random() * ARENA_HEIGHT - margin *  2);
+        this.x = x || (-ARENA_WIDTH / 2 + margin) + (Math.random() * ARENA_WIDTH - margin * 2);
+        this.y = y || (-ARENA_HEIGHT / 2 + margin) + (Math.random() * ARENA_HEIGHT - margin *  2);
         if (this.x < -ARENA_WIDTH / 2 + margin) {
             this.x = -ARENA_WIDTH / 2 + margin;
         }
@@ -45,19 +45,19 @@ class PowerUp {
             this.symbol = "🛡️";
         }
         if (type === "energy") {
-            this.color = "#00ff00"
+            this.color = "#00ff00";
             this.symbol = "🔋";
         }
         if (type === "speed") {
-            this.color = "#ffd500"
+            this.color = "#ffd500";
             this.symbol = "⚡️";
         }
         if (type === "guncool") {
-            this.color = "#6666ff"
+            this.color = "#6666ff";
             this.symbol = "❄️";
         }
         if (type === "firepower") {
-            this.color = "#ff3200"
+            this.color = "#ff3200";
             this.symbol = "🔥";
         }
         if (type === "airstrike") {

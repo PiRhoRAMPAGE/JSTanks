@@ -1,18 +1,20 @@
 class Tank {
     
-    constructor(file, brain, index, x, y, color, bodyAim = Math.random() * 360, gunAim = 0, radarAim = 0) {
+    constructor(file, brain, index, x, y, color, winCount) {
 
         // Things the user can't change
         this.name = file;
+        this.wins = winCount;
+        this.losses = gameCount - winCount;
         this.brain = brain; // callback function for bots main function
         this.index = index;
         this.iteration = 0;
         this.x = x;
         this.y = y;
         this.actualSpeed = 0;
-        this.bodyAim = bodyAim;
-        this.gunAim = gunAim;
-        this.radarAim = radarAim;
+        this.bodyAim = Math.random() * 360;
+        this.gunAim = 0;
+        this.radarAim = 0;
         this.energy = 1000;
         this.size = TANK_SIZE;
         this.gunHeat = 0;
@@ -107,6 +109,11 @@ class Tank {
             if (this.powerup.type === "armor") {
                 this.damageMultiplier = 0.5;
             }
+        } 
+        else {
+            this.powerup.type = null;
+            this.powerup.amount = 0;
+            this.powerup.color = "#00000000";
         }
         
         // Handle energy gain from stalling
@@ -212,9 +219,16 @@ class Tank {
         this.radarAim = (this.radarAim + 360000) % 360;
     
         // Move tank
+        const targetSpeed = this.speed * MAX_ACTUAL_SPEED * this.speedMultiplier;
+        if (this.actualSpeed < targetSpeed) {
+            this.actualSpeed = Math.min(targetSpeed, this.actualSpeed + TANK_ACCELERATION);
+        } 
+        else if (this.actualSpeed > targetSpeed) {
+            this.actualSpeed = Math.max(targetSpeed, this.actualSpeed - TANK_ACCELERATION);
+        }
         this.matchScore += Math.abs(this.speed) * TANK_SPEED_BONUS_POINTS / MAX_ITERATIONS;
-        this.x = this.x + this.actualSpeed * Math.cos(this.bodyAim * Math.PI / 180);
-        this.y = this.y + this.actualSpeed * Math.sin(this.bodyAim * Math.PI / 180);
+        this.x += this.actualSpeed * Math.cos(this.bodyAim * Math.PI / 180);
+        this.y += this.actualSpeed * Math.sin(this.bodyAim * Math.PI / 180);
 
         // Update the tanks tread tracks
         if (Math.abs(this.actualSpeed) > 0.1) {
@@ -260,12 +274,51 @@ class Tank {
         // Calculate tanks accuracy
         this.accuracy = (this.missilesFired > 0) ? this.missilesHit / this.missilesFired : 0;
 
+        // Create a centered proxy of ctx for debugging
+        let canvasCtx;
+        if (allowDebugging.checked) {
+            this.debugWarningShown = false;
+            const properties = {};
+            canvasCtx = new Proxy(ctx, {
+                set: (target, prop, value) => {
+                    properties[prop] = value; 
+                    return true;
+                },
+                get: (target, prop) => {
+                    const val = target[prop];
+                    if (typeof val === 'function') {
+                        return (...args) => {
+                            target.save();
+                            Object.assign(target, properties); 
+                            target.translate(ARENA_WIDTH / 2, ARENA_HEIGHT / 2);
+                            const result = val.apply(target, args);                            
+                            target.restore();
+                            return result;
+                        };
+                    }
+                    return prop in properties ? properties[prop] : val;
+                }
+            });
+        }
+        // Create an empty proxy of ctx if debugging disabled 
+        else {
+            canvasCtx = new Proxy({}, { get: () => () => { 
+                if (this.iteration > 20 && !this.debugWarningShown) {
+                    this.debugWarningShown = true;
+                    this.message = "Debugging Disabled";
+                    this.showMessage = 50;
+                }
+             }});
+        }
+
         // Define parameters for the "brain" function
         const tankData = {
             index: this.index,
+            wins: this.wins,
+            losses: this.losses,
             score: scores[this.index] + this.matchScore|| 0,
             iteration: this.iteration,
-            name: this.file,
+            name: this.name,
             color: this.color,
             fillColor: this.fillColor,
             treadColor: this.treadColor,
@@ -305,6 +358,7 @@ class Tank {
             distanceTo: (x, y) => Math.sqrt((y - this.y) ** 2 + (x - this.x) ** 2),
             fire: (energy) => this.fire(arena, energy),
             message: "",
+            debug: canvasCtx
         }
         
         const arenaData = {
@@ -493,7 +547,6 @@ class Tank {
                 if (actions.speed < -1) actions.speed = -1;
                 if (actions.speed > +1) actions.speed = +1;
                 this.speed = actions.speed;
-                this.actualSpeed = this.speed * MAX_ACTUAL_SPEED;
             }
             else {
                 errors.push("tank.speed must be a number between -1 and 1");
@@ -549,7 +602,7 @@ class Tank {
                 errors.push("tank.retained must be a valid JSON object");
             }
         }
-        if (actions.handicap) {
+        if (actions.handicap || actions.handicap === 0) {
             if (!isNaN(actions.handicap)) {
                 if (!isNaN(actions.handicap) && actions.handicap > 0 && actions.handicap <= 1) {
                     this.handicap = actions.handicap;
@@ -576,31 +629,12 @@ class Tank {
                 }
             }
         }
-        if (actions.message) {
-            if (typeof actions.message === "number") {
-                actions.message = actions.message.toString();
-            }
-            if (typeof actions.message === "string") {
-                if (actions.message.length > 64) {
-                    actions.message = actions.message.substring(64);
-                }
-                this.message = actions.message;
-                this.showMessage = 50;
-            }
-            else {
-                errors.push("tank.message must be a string or number (max length: 64)");
-            }
+        if (actions.message !== "") {
+            this.message = String(actions.message).substring(0, 64);
+            this.showMessage = 50;
         }
-        if (actions.victoryMessage) {
-            if (typeof actions.victoryMessage === "number") {
-                actions.victoryMessage = actions.victoryMessage.toString();
-            }
-            if (typeof actions.victoryMessage === "string") {
-                this.victoryMessage = actions.victoryMessage.toString().substring(0, 64);
-            }
-            else {
-                errors.push("tank.victoryMessage must be a string or number (max length: 64)");
-            }
+        if (actions.victoryMessage !== "") {
+            this.victoryMessage = String(actions.victoryMessage).substring(0, 64);
         }
         if (errors.length > 0) {
             showError({ tank: this.name, errors})
@@ -608,7 +642,7 @@ class Tank {
     }
     
     
-draw(ctx) {
+    draw(ctx) {
 
         // Exit conditions
         if (this.state === "dead") return;
@@ -1037,6 +1071,7 @@ draw(ctx) {
                         aim: (other.aim + 36000) % 360,
                         speed: other.speed / 10,
                         actualSpeed: other.speed,
+                        id: other.id,
                         ownerIndex: other.owner.index,
                     });
                     this.detectedMissiles.sort((a, b) => {
@@ -1194,7 +1229,7 @@ draw(ctx) {
         
         // Create the missile
         const missileEnergy = energy * MISSILE_ENERGY_MULTIPLIER * this.firePowerMultiplier * (1 - this.handicap);
-        const missile = new Missile(this, this.missilesFired, this.x, this.y, this.bodyAim + this.gunAim, missileEnergy, this.size / 2);
+        const missile = new Missile(this, this.missilesFired, this.x, this.y, this.bodyAim + this.gunAim, missileEnergy);
         arena.missiles.push(missile);
 
         // Set up the muzzle flash
@@ -1202,6 +1237,5 @@ draw(ctx) {
 
         return this.missilesFired || false;
     }
-    
 }
 

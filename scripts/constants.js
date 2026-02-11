@@ -6,7 +6,7 @@ const GLOBAL_STORAGE_KEY = "_JSTanks";
 const PI = Math.PI;
 const DEGREES = 180 / Math.PI;
 const RADIANS = Math.PI / 180;
-const EPSILON = 1 / Number.MAX_SAFE_INTEGER;
+const EPSILON = Number.EPSILON;
 
 // Game duration
 const MAX_MATCHES = urlParams.has("matches") ? urlParams.get("matches") : (urlParams.has("tournament") ? 1000 : 1000000);
@@ -26,6 +26,7 @@ const TANK_SIZE = 6;
 const MAX_TANK_ENERGY = 1000;
 const MIN_ACTUAL_SPEED = -TANK_SIZE / 2.5;
 const MAX_ACTUAL_SPEED = TANK_SIZE / 2.5;
+const TANK_ACCELERATION = MAX_ACTUAL_SPEED / 5;
 const MAX_BODY_TURN_DEGREES = 10;
 const MAX_GUN_TURN_DEGREES = 15;
 const MAX_RADAR_TURN_DEGREES = 45;

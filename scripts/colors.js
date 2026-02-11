@@ -2,6 +2,29 @@ function getRandomColorHex() {
     return '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
 }
 
+function hexToRGBA(hexColor) {
+    // Validate input
+    if (!/^#([0-9A-F]{3}){1,2}$/i.test(hexColor)) {
+        throw new Error("Invalid hexadecimal color code.");
+    }
+    
+    // Remove the '#' if present and convert to 6-digit hex
+    let hex = hexColor.slice(hexColor.startsWith('#') ? 1 : 0);
+    if (hex.length === 3) {
+        hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+    }
+    
+    // Convert hex to RGBA components
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+    let a = 255;
+    if (hex.length === 8) {
+        a = parseInt(hex.slice(6, 8), 16);
+    }
+    return { r, g, b, a };
+}
+
 function adjustBrightness(hexColor, brightnessFactor) {
     // Validate inputs
     if (!/^#([0-9A-F]{3}){1,2}$/i.test(hexColor)) {

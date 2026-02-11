@@ -119,13 +119,13 @@ function newGame() {
     let y = distance * Math.sin(angle * Math.PI / 180);
     // Use the selected tank A AI
     const tankAFunction = typeof getSelectedTankA === "function" ? getSelectedTankA() : tankAMain;
-    tanks[0] = new Tank(tankFileA, tankAFunction, 0, x, y, getRandomColorHex());
+    tanks[0] = new Tank(tankFileA, tankAFunction, 0, x, y, getRandomColorHex(), winCounts[0]);
 
     x = distance * Math.cos(180 + angle * Math.PI / 180);
     y = distance * Math.sin(180 + angle * Math.PI / 180);
     // Use the selected tank B AI
     const tankBFunction = typeof getSelectedTankB === "function" ? getSelectedTankB() : tankBMain;
-    tanks[1] = new Tank(tankFileB, tankBFunction, 1, x, y, getRandomColorHex());
+    tanks[1] = new Tank(tankFileB, tankBFunction, 1, x, y, getRandomColorHex(), winCounts[1]);
 
     // Randomize tank order to eliminate positional advantages
     tanks = shuffleArray(tanks);
@@ -745,36 +745,22 @@ function updateLeaderboard(winner, tanks) {
     leaderboard[tankBName]._average = totalsB.average;
     leaderboard[tankBName]._total = totalsB.matches;
     leaderboard[tankBName]._total_wins = totalsB.wins;
-    leaderboard[tankBName]._total_losses = totalsB.losses;
+    leaderboard = updateLeaderboardWithWHR(leaderboard);
     document.getElementById("divLeaderboard").innerHTML = generateLeaderboardTable();
     commitMemory(GLOBAL_STORAGE_KEY, leaderboard);
 }
 
-function calculateGeometricScore(data, tankName) {
-    const stats = data[tankName];
-    if (!stats) return 0;
-    const globalWinRate = stats._average / 100;
-    const localRates = Object.keys(stats)
-        .filter(key => !key.startsWith('_') && key !== 'elo')
-        .map(opponent => stats[opponent].average / 100);
-    const factors = [globalWinRate, ...localRates];
-    const smoothedFactors = factors.map(rate => Math.max(rate, 0.001));
-    const product = smoothedFactors.reduce((acc, rate) => acc * rate, 1);
-    const n = smoothedFactors.length;
-    const geometricMean = Math.pow(product, 1 / n);
-    return geometricMean;
-}
-
 
 function generateLeaderboardTable() {
+    leaderboard = updateLeaderboardWithWHR(leaderboard);
     let tableHTML = `<br><h3>Tank's Ranks</h3><table id="tblLeaderboard">`;
     const tankNames = Object.keys(leaderboard).sort((a, b) => {
-        const avgA = leaderboard[a].elo || 0;
-        const avgB = leaderboard[b].elo || 0;
+        const avgA = leaderboard[a].whr || 0;
+        const avgB = leaderboard[b].whr || 0;
         return avgB - avgA;
     });
     if (tankNames.length > 0) {
-        tableHTML += `<thead><tr><th>Tank</th><th>Elo</th><th>Win %</th><th>Matches</th></tr></thead><tbody>`;
+        tableHTML += `<thead><tr><th>Tank</th><th>Elo</th><th>WHR</th><th>Win %</th><th>Matches</th></tr></thead><tbody>`;
     }
     tankNames.forEach((tankAName) => {
         const tankAOverallStats = leaderboard[tankAName];
@@ -782,6 +768,7 @@ function generateLeaderboardTable() {
         tableHTML += `<tr class="trHeader" onclick="toggleVsRows('${tankAName}')" style="cursor:pointer;">`;
         tableHTML += `<td><strong>${tankAName}</strong></td>`;
         tableHTML += `<td><strong>${Math.round(tankAOverallStats.elo)}</strong></td>`;
+        tableHTML += `<td><strong>${Math.round(tankAOverallStats.whr)}</strong></td>`;
         tableHTML += `<td><strong>${tankAOverallWinPct.toFixed(2)}%</strong></td>`;
         tableHTML += `<td class="col-matches"><strong>${tankAOverallStats._total}</strong></td>`;
         tableHTML += `</tr>`;
@@ -798,11 +785,19 @@ function generateLeaderboardTable() {
                     eloDifColor = "#66ff66";
                     eloDif = `+${eloDif}`;
                 }
+                let whrDif = Math.round(tankAOverallStats.whr - tankBOverallStats.whr);
+                if (whrDif === 0) whrDifColor = "#dadb8a";
+                if (whrDif < 0) whrDifColor = "#ff6666";
+                if (whrDif > 0) {
+                    whrDifColor = "#66ff66";
+                    whrDif = `+${whrDif}`;
+                }
                 const isCurrentMatchup = tankAName === tanks[0]?.name || tankAName === tanks[1]?.name;
                 const display = isCurrentMatchup ? "table-row" : "none";
                 tableHTML += `<tr class="child-row" data-parent="${tankAName}" style="display:${display}; background-color: #2a2a2a;">`;
                 tableHTML += `<td class="col-vs-name" style="padding-left: 20px;">vs. ${tankBName}</td>`;
                 tableHTML += `<td style="color: ${eloDifColor}">${eloDif}</td>`;
+                tableHTML += `<td style="color: ${whrDifColor}">${whrDif}</td>`;
                 tableHTML += `<td>${tankAWinPct.toFixed(2)}%</td>`;
                 tableHTML += `<td class="col-matches">${h2hAB.matches}</td>`;
                 tableHTML += `</tr>`;
@@ -834,6 +829,48 @@ function resetRanks() {
     }
 }
 
+function updateLeaderboardWithWHR(data, iterations = 20) {
+    const players = Object.keys(data);
+    const ratings = {};
+    players.forEach(p => ratings[p] = 0);
+    for (let iter = 0; iter < iterations; iter++) {
+        const gradients = {};
+        const hessians = {};
+        players.forEach(p => {
+            gradients[p] = 0;
+            hessians[p] = 0;
+        });
+        for (const playerA of players) {
+            for (const playerB of Object.keys(data[playerA])) {
+                if (playerB.startsWith('_') || playerB === 'elo' || !ratings.hasOwnProperty(playerB)) continue;
+                const games = data[playerA][playerB];
+                const winsA = games.wins;
+                const lossesA = games.losses;                
+                if (winsA === 0 && lossesA === 0) continue;
+                const rA = ratings[playerA];
+                const rB = ratings[playerB];
+                const expA = Math.exp(rA);
+                const expB = Math.exp(rB);
+                const probA = expA / (expA + expB);
+                const totalGames = winsA + lossesA;
+                gradients[playerA] += (winsA - totalGames * probA);
+                hessians[playerA] -= (totalGames * probA * (1 - probA));
+            }
+        }
+        players.forEach(p => {
+            if (Math.abs(hessians[p]) > 1e-9) {
+                const step = gradients[p] / hessians[p];
+                ratings[p] -= step * 0.8; 
+            }
+        });
+    }
+    players.forEach(p => {
+        const whrScore = 1500 + (ratings[p] * (400 / Math.log(10)));
+        data[p].whr = parseFloat(whrScore.toFixed(2));
+    });
+
+    return data;
+}
 
 function calculateElos(a, b, winner) {
     const K_FACTOR = 32;

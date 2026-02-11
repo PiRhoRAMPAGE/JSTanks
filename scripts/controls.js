@@ -7,6 +7,7 @@ document.getElementById("divSpeed").title = "Select the game speed.";
 document.getElementById("divView").title = "Show animations:\nDisable to run game at max speed.";
 document.getElementById("divSound").title = "Disable sounds:\nSounds are not recommended at height game speeds";
 document.getElementById("divBlocking").title = "Missile Interception:\nWhen enabled missiles can intercept, and detonate each other.";
+document.getElementById("divDebugging").title = "Debug Drawing: When enabled tanks can draw to the canvas for debugging purposes.";
 document.getElementById("divPowerups").title = "Enable Powerups:\nWhen enabled powerups will randomly spawn.";
 
 const btnLeaderboard = document.getElementById("btnLeaderboard");
@@ -19,6 +20,7 @@ const selGameSpeed = document.getElementById("selSpeed");
 const showAnimation = document.getElementById("toggleView");
 const enableSound = document.getElementById("toggleSound");
 const allowBlocking = document.getElementById("toggleBlocking");
+const allowDebugging = document.getElementById("toggleDebugging");
 const powerupsEnabled = document.getElementById("togglePowerups");
 
 if (urlParams.has("headless")) {

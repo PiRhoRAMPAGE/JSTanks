@@ -1,16 +1,11 @@
-const SIN_TABLE_SIZE = 4096;
-const SIN_LOOKUP = new Array(SIN_TABLE_SIZE);
-for (let i = 0; i < SIN_TABLE_SIZE; i++) {
-    const angle = (i / SIN_TABLE_SIZE) * 2 * Math.PI; // Normalize angle to 0 to 2*PI
-    SIN_LOOKUP[i] = Math.sin(angle);
-}
-Math.sin = (angle) => {
-    let normalizedAngle = angle % (2 * Math.PI);
-    if (normalizedAngle < 0) normalizedAngle += 2 * Math.PI;
-    const index = Math.round((normalizedAngle / (2 * Math.PI)) * (SIN_TABLE_SIZE - 1));
-    return SIN_LOOKUP[index];
+
+const lerp = (a, b, lerpFactor) => {
+    return a * (1 - lerpFactor) + b * lerpFactor;
 };
 
+const clamp = (number, min, max) => {
+    return Math.max(min, Math.min(max, number));
+};
 
 const getDistance = (x1, y1, x2, y2) => {
     return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
@@ -20,30 +15,18 @@ const getAngle = (x1, y1, x2, y2) => {
     return Math.atan2(y2 - y1, x2 - x1) * DEGREES;
 };
 
-const lerp = (a, b, lerpFactor) => {
-    return a * (1 - lerpFactor) + b * lerpFactor;
+const normalizeAngle = (angleDegrees) => {
+    angleDegrees %= 360;
+    if (angleDegrees > 180) angleDegrees -= 360;
+    if (angleDegrees < -180) angleDegrees += 360;
+    return angleDegrees;
 };
 
-const normalizeAngle = (angle) => {
-    angle %= 360;
-    if (angle > 180) angle -= 360;
-    if (angle < -180) angle += 360;
-    return angle;
-};
-
-
-const COS_TABLE_SIZE = SIN_TABLE_SIZE;
-const COS_LOOKUP = new Array(COS_TABLE_SIZE);
-for (let i = 0; i < COS_TABLE_SIZE; i++) {
-    const angle = (i / COS_TABLE_SIZE) * 2 * Math.PI;
-    COS_LOOKUP[i] = Math.cos(angle);
+const dotProduct2D = (x1, y1, x2, y2) => {
+    return (x1 * x2) + (y1 * y2);
 }
-Math.cos = (angle) => {
-    let normalizedAngle = angle % (2 * Math.PI);
-    if (normalizedAngle < 0) normalizedAngle += 2 * Math.PI;
-    const index = Math.round((normalizedAngle / (2 * Math.PI)) * (COS_TABLE_SIZE - 1));
-    return COS_LOOKUP[index];
-};
+
+
 
 class Angle {
     constructor(radians) {
@@ -80,6 +63,7 @@ class Angle {
     }
 }
 
+
 class Vector2 {
     constructor(x, y) {
         this._x = x;
@@ -94,4 +78,3 @@ class Vector2 {
         return Math.sqrt((this._x - other._x) ** 2 + (this._y - other._y) ** 2)
     }
 }
-

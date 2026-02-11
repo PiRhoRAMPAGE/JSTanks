@@ -1,151 +1,415 @@
-function main(tank, arena) {
+/*
+     I tried making Gemini build an opponent...
+     Had to hold it's hand through every step of the process,
+     and it still has a lower win rate than the tank I made
+     even with the genetic algorithm, it never really improves.
+     I am keeping it in the pool because it does outperform
+     most of the other tanks.
+*/
 
-    // Utility functions (same as before)
-    tank.angleTo = (x, y) => Math.atan2(y - tank.y, x - tank.x) * 180 / Math.PI;
-    tank.distanceTo = (x, y) => Math.sqrt((y - tank.y) ** 2 + (x - y) ** 2);
-    tank.angleDifference = (a1, a2) => {
-        a1 = (a1 + 360000) % 360;
-        a2 = (a2 + 360000) % 360;
-        if (a1 > 180) a1 -= 360;
-        if (a2 > 180) a2 -= 360;
-        return (a2 - a1 + 180) % 360 - 180;
+function main(tank, arena) {
+    const STORAGE_KEY = `${tank.name}_DNA`;
+    const mem = tank.retained;
+    // Loads DNA from localStorage
+    const getDNA = () => {
+        try {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) return JSON.parse(stored);
+        } catch (e) {}
+        return {
+            generation: 0,
+            bestFitness: -Infinity,
+            momentum: {},
+            dna: {
+                wallFear: 8000,
+                missileFear: 7000,
+                powerupGreed: 6000,
+                targetDistance: ARENA_WIDTH / 2,
+                targetDistanceWeight: 20,
+                aggression: 1,
+                gunAimThresh: 10,
+                firingWeightDistance: 0.90,
+                firingWeightTrajectory: 0.75,
+                firingWeightAccuracy: 0.1,
+                powerupCaution: 0.5,
+                scanInterval: 50,
+                predictionSampleSize: 7,
+                missileSafetyBuffer: 2.5,
+                missileThreatDistanceWeight: 0.5,
+                missileThreatAccuracyWeight: 0.35,
+                missileThreatEnergyWeight: 0.15,
+                wallSafetyBuffer: 2.5,
+                targetSafetyBuffer: 2.5,
+            }
+        };
+    };
+    // Saves DNA to localStorage
+    const saveDNA = (record) => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(record)) } catch (e) {} };
+    // Predicts the future position of a tank or missile
+    const predictPosition = (t, iterations) => {
+        let predicted = { ...t };
+        const initialTrajectory = t.bodyAim || t.aim;
+        const history = tank.retained.targetHistory;
+        const recentStates = history.slice(-Math.round(DNA.predictionSampleSize));
+        const weightSum = (recentStates.length * (recentStates.length + 1)) / 2;
+        let avgRotationRate = 0;
+        let avgSpeed = 0;
+        let isContinuous = true;
+        recentStates.slice(1).forEach((state, i) => {
+            const weight = i;
+            const prev = recentStates[i];            
+            if (!isContinuous || prev.iteration !== state.iteration - 1) {
+                isContinuous = false;
+                return;
+            }
+            const stateAim = state.bodyAim || state.aim;
+            const prevAim = prev.bodyAim || prev.aim;            
+            avgRotationRate += normalizeAngle(stateAim - prevAim) * weight;
+            avgSpeed += state.actualSpeed * weight;
+        });
+        avgRotationRate /= weightSum;
+        avgSpeed /= weightSum;
+        let currentRotation = initialTrajectory * RADIANS;
+        const stepRotation = avgRotationRate * RADIANS;
+        for (let i = 0; i < iterations; i++) {
+            let vx = Math.cos(currentRotation) * avgSpeed;
+            let vy = Math.sin(currentRotation) * avgSpeed;            
+            const nextX = predicted.x + vx;
+            const nextY = predicted.y + vy;
+            if (t.bodyAim) {
+                vx = (nextX - tank.size < MIN_X || nextX + tank.size > MAX_X) ? 0 : vx;
+                vy = (nextY - tank.size < MIN_Y || nextY + tank.size > MAX_Y) ? 0 : vy;
+            }
+            predicted.x += vx;
+            predicted.y += vy;
+            currentRotation += stepRotation;
+        }
+        predicted.angleTo = tank.angleTo(predicted.x, predicted.y);
+        predicted.distance = tank.distanceTo(predicted.x, predicted.y);
+        predicted.energy -= Math.abs(avgSpeed) * iterations * MOVEMENT_COST_MULTIPLIER;
+        return predicted;
+    };
+    // Calculates the normalized lateral speed of a target
+    const getPerpendicularComponent = (t) => {
+        const angleDifference = normalizeAngle(t.angleTo - t.bodyAim);
+        return Math.sin(angleDifference * RADIANS);
+    };        
+    // Calculates tanks aim accuracy over specified number of frames
+    const getRecentAccuracy = (frames) => {
+        const allMissiles = Object.values(tank.missiles);
+        const recentMissiles = allMissiles.filter(m => (tank.iteration - m.iterationFired) <= frames);
+        const completedShots = recentMissiles.filter(m => m.hit || m.miss);
+        if (completedShots.length === 0) return 0.5;
+        const hits = completedShots.filter(m => m.hit).length;
+        return hits / completedShots.length;
+    };
+    // Calculates the saftey score of a particular path
+    const getPathScore = (x, y) => {
+        let weight = 0;
+        const wallDist = Math.min(x - MIN_X, MAX_X - x, y - MIN_Y, MAX_Y - y);
+        // Walls
+        if (wallDist < TANK_SIZE * DNA.wallSafetyBuffer) weight -= DNA.wallFear / Math.max(1, wallDist);
+        // Missiles
+        incomingMissiles.forEach(m => { weight -= DNA.missileFear / (m.distance + 1) });
+        // Targets
+        if (target) {
+            weight -= Math.abs(target.distance - DNA.targetDistance) * DNA.targetDistanceWeight;
+            if (target.distance < tank.size * DNA.targetSafetyBuffer) target.isTooClose == true;
+        }
+        // Powerups
+        mem.powerups.forEach(p => {
+            const enemy = mem.target || tank;        
+            const enemyAccess = 1 - getDistance(enemy.x, enemy.y, p.x, p.y) / MAX_DISTANCE;
+            const myAccess = 1 - tank.distanceTo(p.x, p.y) / MAX_DISTANCE;
+            const canReachInTime = p.duration >= (p.distance / MAX_ACTUAL_SPEED);
+            const riskValue = (enemyAccess * enemy.energy / MAX_TANK_ENERGY) * (p.distance / MAX_DISTANCE);
+            let rewardValue = (myAccess * tank.energy / MAX_TANK_ENERGY) * (p.amount / MAX_POWERUP_AMOUNT);
+            rewardValue -= DNA.powerupCaution - 0.5;
+            if (rewardValue > riskValue && canReachInTime) {
+                const d = getDistance(x, y, p.x, p.y);
+                weight += (1 - d / MAX_DISTANCE) * DNA.powerupGreed;
+            }
+        });
+        return weight;
     };
 
-    // Initialization (same as before, but add history)
-    if (tank.iteration === 0) {
-        tank.color = "#ffa500";
-        tank.fillColor = "#442c00";
-        tank.treadColor = "#f4a460";
-        tank.gunColor = "#ffa500";
-        tank.radarArc = 1;
-        tank.speed = 0;
-        tank.bodyTurn = 0;
-        tank.gunTurn = 0;
-        tank.radarTurn = 0; // Initially, radar is aligned
-        tank.retained.target = null;
-        tank.retained.evasiveManeuver = 0;
-        tank.retained.lastKnownPosition = null;
-        tank.retained.targetHistory = []; // Track target positions
-        tank.retained.wallAvoidancePhase = 0;
-        tank.retained.aimAccuracy = 0.7; // Initial aim accuracy
+    // Initialize DNA and memory
+    if (!mem.init) {
+        let record = getDNA();
+        let currentDNA = { ...record.dna };
+        let deltas = {};
+        const stats = record.stats || { wallCollisions: 0, damageRatio: 0.5, avgAccuracy: 0.5, energyRatio: 0.5 };
+        const fitnessGap = 1 - (record.bestFitness || 0.01);
+        const mutationRate = clamp(fitnessGap / 500, 0.01, 0.2);
+        const mutationProbability = clamp(fitnessGap / 1000, 0.01, 0.1);         
+        // Categorize genes for intelligent mutation
+        const categories = {
+            WallAvoidance: ['wallFear', 'wallSafetyBuffer'],
+            Evasion: ['missileFear', 'missileSafetyBuffer', 'missileThreatDistanceWeight', 'missileThreatAccuracyWeight', 'missileThreatEnergyWeight', 'targetSafetyBuffer'],
+            Targeting: ['gunAimThresh', 'predictionSampleSize', 'targetDistance', 'targetDistanceWeight'],
+            Ballistics: ['firingWeightDistance', 'firingWeightTrajectory', 'firingWeightAccuracy', 'aggression'],
+            ResourceManagement: ['powerupGreed', 'powerupCaution', 'scanInterval']
+        };
+        let targetCategories = [];
+        // Select genes to mutate based off previous performance metrics
+        if (stats.wallCollisions > 0) targetCategories.push('WallAvoidance');
+        if (stats.avgAccuracy < 0.5) targetCategories.push('Targeting', 'Ballistics');
+        if (stats.damageRatio < 0.5) targetCategories.push('Evasion', 'Targeting', 'Ballistics');
+        if (stats.energyRatio < 0.5) targetCategories.push('ResourceManagement', 'Evasion', 'Targeting', 'Ballistics');
+        if (targetCategories.length === 0) targetCategories.push('Evasion', 'WallAvoidance', 'Targeting', 'Ballistics', 'ResourceManagement')
+        const targetCategory = targetCategories[Math.floor(Math.random() * targetCategories.length)];
+        const dnaPool = categories[targetCategory];
+        const forcedKey = dnaPool[Math.floor(Math.random() * dnaPool.length)];
+        // Apply the mutations
+        Object.keys(currentDNA).forEach(key => {
+            if (typeof currentDNA[key] !== 'number') return;
+            const shouldMutate = (key === forcedKey) || (Math.random() < mutationProbability);            
+            if (shouldMutate) {
+                let dir = record.momentum[key] || (Math.random() > 0.5 ? 1 : -1);
+                if (Math.random() < 0.2) dir *= -1; 
+                currentDNA[key] += currentDNA[key] * mutationRate * dir;
+                deltas[key] = dir;
+            } else { deltas[key] = record.momentum[key] || 0 }
+        });          
+        // Initialize memory
+        mem.dna = currentDNA;
+        mem.deltas = deltas;
+        mem.startEnergy = tank.energy;
+        mem.damageDealt = 0;
+        mem.init = true;
+        mem.target = tank;
+        mem.damageTaken = 0;
+        mem.damageDealt = 0;
+        mem.lastDamageTaken = 0;
+        mem.lastDamageDealt = 0;        
+        mem.powerupsSeen = 0;
+        mem.powerupsCollected = 0;
+        mem.wallCollisions = 0;
+        mem.powerups = [];
+        mem.targetHistory = [];
+    }
+    const DNA = mem.dna;
+
+    // Update damage stats
+    if (tank.missileCollision) mem.damageTaken += tank.missileCollision.damage;
+    mem.damageDealt = 0;
+    tank.missiles.forEach(m => { if (m.hit) mem.damageDealt += m.energy });
+    if (tank.wallCollision) mem.wallCollisions++;
+
+    // Update missile data
+    const incomingMissiles = tank.detectedMissiles.filter(m => {
+        const safetyBuffer = tank.size * DNA.missileSafetyBuffer;
+        const dx = m.x - tank.x;
+        const dy = m.y - tank.y;
+        const mvx = Math.cos(m.aim * RADIANS) * MISSILE_SPEED;
+        const mvy = Math.sin(m.aim * RADIANS) * MISSILE_SPEED;
+        const dotProduct = dotProduct2D(mvx, mvy, dx, dy);
+        if (dotProduct >= 0) return false; // Missile moving away
+        const timeToCpa = -dotProduct / (MISSILE_SPEED ** 2);
+        const cpaX = m.x + mvx * timeToCpa;
+        const cpaY = m.y + mvy * timeToCpa;
+        const distAtCpa = tank.distanceTo(cpaX, cpaY);
+        m.priority = (
+            DNA.missileThreatDistanceWeight * (1 - (m.distance / MAX_DISTANCE) ** 2) +
+            DNA.missileThreatAccuracyWeight * (1 - (distAtCpa / safetyBuffer) ** 2) +
+            DNA.missileThreatEnergyWeight * (m.energy / MAX_MISSILE_ENERGY) 
+        );
+        return distAtCpa < safetyBuffer;
+    }).sort((a, b) => b.priority - a.priority);
+
+    // Update powerup data
+    mem.powerups = mem.powerups.filter(p => {
+        p.duration--;
+        p.distance = tank.distanceTo(p.x, p.y);
+        let isCollected = tank.powerupCollected || p.distance < tank.size * 2;
+        if (isCollected) mem.powerupsCollected++;
+        if (!isCollected && tank.detectedTanks.length > 0) {
+            isCollected = tank.detectedTanks.some(enemy => {
+                const distToEnemy = getDistance(enemy.x, enemy.y, p.x, p.y);
+                if (distToEnemy <= enemy.size * 2) {
+                    mem.powerupsCollectedByTarget++;
+                    return true;
+                }
+                return false;
+            });
+        }
+        const isExpired = p.duration <= 0;
+        return !isCollected && !isExpired;
+    });
+    tank.detectedPowerups.forEach(newP => {
+        const exists = mem.powerups.find(p => p.x === newP.x && p.y === newP.y);
+        if (!exists) {
+            mem.powerupsSeen++;
+            mem.powerups.push(newP)
+        }
+        else exists.duration = newP.duration;
+    });
+
+    // Calculate DNA fitness
+    const totalDamageExchanged = mem.damageDealt + mem.damageTaken;
+    const damageRatio = totalDamageExchanged > 0 ? (mem.damageDealt / totalDamageExchanged) : 0.5;
+    const winRate = tank.wins / (gameCount || 1);
+    const energyRatio = tank.energy / (tank.energy + mem.target.energy);
+    const powerupRatio = mem.powerupsSeen > 0 ? mem.powerupsCollected / mem.powerupsSeen : 0.5;
+    const accuracyRatio = tank.aimAccuracy || 0.5;
+    const fitness = (() => {
+        return (
+            winRate * 55 +
+            damageRatio * 20 +
+            energyRatio * 15 +
+            powerupRatio * 6 + 
+            accuracyRatio * 4 
+        );
+    })();
+
+    // Save DNA
+    if (tank.iteration % 100 === 0 || arena.tanksRemaining === 1) {
+        let record = getDNA();
+        if (fitness > record.bestFitness) {
+            record.bestFitness = fitness;
+            record.dna = { ...DNA };
+            record.momentum = { ...mem.deltas };
+            record.generation++;
+            record.damageRatio = damageRatio;
+            record.energyRatio = energyRatio;
+            record.accuracyRatio = accuracyRatio;
+            record.winRate = winRate;
+            record.wallCollisions = mem.wallCollisions;
+            saveDNA(record);
+        }
+        mem.record = record;
     }
 
-    // Movement
-    let desiredSpeed = 0.75;
-    let angleToCenter = tank.angleTo(0, 0);
-    let angleDifferenceToCenter = tank.angleDifference(tank.bodyAim, angleToCenter);
-    tank.speed = desiredSpeed;
+    // Aesthetics
+    tank.color = "#338888";
+    const pValue = (fitness - mem.record.bestFitness) / 100;
+    const saturation1 = (~~Math.abs(pValue * 255)).toString(16).padStart(2, "0");
+    const saturation2 = (~~Math.abs(-pValue * 255)).toString(16).padStart(2, "0");
+    if (pValue > 0) { tank.fillColor = `#${saturation1}${saturation2}00` }
+    else if (pValue < 0) { tank.fillColor = `#${saturation2}${saturation1}00`};
+    tank.message = `GEN ${getDNA().generation} | P: ${Math.floor(pValue * 100)}`;
 
-    // Target Acquisition
+    // Target Prioritization
+    let target = null;
     if (tank.detectedTanks.length > 0) {
-        // Prioritize "Rampage" or closest tank
-        tank.retained.target = tank.detectedTanks.find(t => t.name === "Rampage") || tank.detectedTanks.reduce((closest, t) => tank.distanceTo(t.x, t.y) < tank.distanceTo(closest.x, closest.y) ? t : closest, tank.detectedTanks[0]);
+        target = tank.detectedTanks.sort((a, b) => {
+            const aPriority = (1 - a.distance / MAX_DISTANCE) * (1 - a.energy / MAX_TANK_ENERGY);
+            const bPriority = (1 - b.distance / MAX_DISTANCE) * (1 - b.energy / MAX_TANK_ENERGY);
+            return bPriority - aPriority;
+        })[0];
+        mem.target = target;
     }
 
-    // Declare both angleToTarget and bodyAngleDifference here
-    let angleToTarget = 0;
-    let bodyAngleDifference = 0;
-
-    if (tank.retained.target) {
-        const target = tank.retained.target;
-        const distanceToTarget = tank.distanceTo(target.x, target.y);
-        angleToTarget = tank.angleTo(target.x, target.y);
-        bodyAngleDifference = tank.angleDifference(tank.bodyAim, angleToTarget);
-        const gunAngleDifference = tank.angleDifference(tank.bodyAim + tank.gunAim, angleToTarget);
-
-        // Predictive Aiming (Enhanced)
-        let predictedX = target.x;
-        let predictedY = target.y;
-        if (tank.retained.targetHistory.length > 2) {
-            // Using a longer history for smoother prediction
-            const lastPos = tank.retained.targetHistory[tank.retained.targetHistory.length - 1];
-            const secondLastPos = tank.retained.targetHistory[tank.retained.targetHistory.length - 2];
-            const thirdLastPos = tank.retained.targetHistory[tank.retained.targetHistory.length - 3];
-            const dx = (lastPos.x - secondLastPos.x + secondLastPos.x - thirdLastPos.x) / 2; // Average change
-            const dy = (lastPos.y - secondLastPos.y + secondLastPos.y - thirdLastPos.y) / 2;
-            predictedX = target.x + dx * tank.retained.target.actualSpeed;
-            predictedY = target.y + dy * tank.retained.target.actualSpeed;
-        }
-        const predictedAngle = tank.angleTo(predictedX, predictedY);
-
-        // Aim with adjusted accuracy
-        let aimError = (Math.random() - 0.5) * 10 * (1 - tank.retained.aimAccuracy);
-        tank.gunTurn = tank.angleDifference(tank.gunAim, predictedAngle - tank.bodyAim + aimError) / 10;
-
-        // Firing Strategy
-        if (Math.abs(gunAngleDifference) < 3 && Math.random() > 0.9) {
-            // More frequent, but controlled fire
-            tank.fire = tank.energy > 150 ? 4 + Math.random() * 3 : tank.energy / 3;
-        }
-
-        // Evasive Maneuvers (slightly more aggressive)
-        if (distanceToTarget < arena.width / 2.5) {
-            const evadeAngle = angleToTarget + 90 + (Math.random() - 0.5) * 40; // Add some variation
-            const evadeDirection = Math.sin(tank.iteration / 15) > 0 ? 1 : -1;
-            tank.bodyTurn = tank.angleDifference(tank.bodyAim, evadeAngle + (35 * evadeDirection)) / 180;
-            desiredSpeed = 0.9;
-        }
-
-        // Target Tracking
-        tank.retained.targetHistory.push({ x: target.x, y: target.y });
-        if (tank.retained.targetHistory.length > 10) tank.retained.targetHistory.shift();
-
-        // Engage or disengage (more nuanced)
-        if (tank.energy < target.energy * 0.7) {
-            desiredSpeed = 1; // Flee, but not blindly
-            tank.bodyTurn = tank.angleDifference(tank.bodyAim, angleToTarget + 170 + (Math.random() - 0.5) * 20) / 180;
-        }
-        else {
-            desiredSpeed = Math.min(1, distanceToTarget / (arena.width / 4)); // Closer approach
-            tank.bodyTurn = bodyAngleDifference / 180;
-            // Gradually improve aim
-            tank.retained.aimAccuracy = Math.min(0.95, tank.retained.aimAccuracy + 0.005);
-        }
-        tank.speed = desiredSpeed;
-
-    } else {
-        tank.retained.aimAccuracy = 0.7; // Reset aim accuracy
-    }
-
-    // Radar - keep scanning or tracking (more focused)
-    if (!tank.retained.target) {
-        tank.radarTurn = 0.4; // Slightly slower, more deliberate scan
-    } else {
-        // Focused tracking, but occasionally widen
-        tank.radarTurn = tank.angleDifference(tank.radarAim, angleToTarget) / 10 + (Math.random() < 0.05 ? 0.3 : 0);
-    }
-
-    // Energy management (more conservative)
-    if (tank.speed === 0) {
-        tank.speed = 0.3; // Slower stall recovery
-    }
-
-    // Wall collision avoidance (as before, but with reset)
-    let wallProximityThreshold = tank.actualSpeed * 5;
-    const isNearWall = (
-        tank.x + tank.actualSpeed * Math.cos(tank.bodyAim * Math.PI / 180) < -arena.width / 2 + wallProximityThreshold ||
-        tank.x + tank.actualSpeed * Math.cos(tank.bodyAim * Math.PI / 180) > arena.width / 2 - wallProximityThreshold ||
-        tank.y + tank.actualSpeed * Math.sin(tank.bodyAim * Math.PI / 180) < -arena.height / 2 + wallProximityThreshold ||
-        tank.y + tank.actualSpeed * Math.sin(tank.bodyAim * Math.PI / 180) > arena.height / 2 - wallProximityThreshold
-    );
-    if (isNearWall) {
-        if (tank.retained.wallAvoidancePhase === 0) {
-            tank.retained.wallAvoidancePhase = 1;
-            if (angleDifferenceToCenter > 0) {
-                tank.bodyTurn = -0.5;
-            } else {
-                tank.bodyTurn = 0.5;
+    // Simulate next moves
+    let bestScore = -Infinity;
+    let bestMove = { speed: 0, turn: 0 };
+    for (let t = -1; t <= 1; t += 0.2) {
+        for (let s = -1; s <= 1; s += 0.2) {
+            const simA = tank.bodyAim + (t * MAX_BODY_TURN_DEGREES);
+            const mvx = Math.cos(simA * RADIANS) * s * MAX_ACTUAL_SPEED;
+            const mvy = Math.sin(simA * RADIANS) * s * MAX_ACTUAL_SPEED;
+            const lookAheads = [1, 5, 10, 15]; 
+            let pathScore = 0;
+            for (let i = 0; i < lookAheads.length; i++) {
+                const frames = lookAheads[i];
+                const simX = tank.x + (mvx * frames);
+                const simY = tank.y + (mvy * frames);
+                pathScore += getPathScore(simX, simY) / (1 + i ** 2);
             }
-        } else if (tank.retained.wallAvoidancePhase > 20) {
-            tank.retained.wallAvoidancePhase = 0;
-        } else {
-            tank.retained.wallAvoidancePhase++;
-        }
-        tank.speed = desiredSpeed * 0.5;
-    } else {
-        tank.retained.wallAvoidancePhase = 0;
-        tank.bodyTurn = bodyAngleDifference / 180;
-    }
 
+            if (pathScore > bestScore) {
+                bestScore = pathScore;
+                bestMove = { speed: s, turn: t };
+            }
+        }
+    }
+    tank.speed = bestMove.speed;
+    tank.bodyTurn = bestMove.turn;
+
+    // Target engagement
+    if (target) {
+        // Predictive aiming 
+        const eventRecord = { ...target };
+        let predicted = { ...target };
+        let missileTime = target.distance / MISSILE_SPEED;
+        let gunWorldAngle = tank.bodyAim + tank.gunAim;
+        let turretTurnTime = Math.abs(normalizeAngle(target.angleTo - gunWorldAngle)) / MAX_GUN_TURN_DEGREES;
+        for (let i = 0; i < missileTime; i++) {
+            const lastX = predicted.x;
+            const lastY = predicted.y;
+            const prediction = predictPosition(target, missileTime + turretTurnTime);
+            predicted.x = lastX + (prediction.x - lastX) / 2;
+            predicted.y = lastY + (prediction.y - lastY) / 2;
+            const newDist = tank.distanceTo(predicted.x, predicted.y);
+            missileTime = newDist / MISSILE_SPEED;
+            const angleToNewSpot = tank.angleTo(predicted.x, predicted.y);
+            turretTurnTime = Math.abs(normalizeAngle(angleToNewSpot - gunWorldAngle)) / MAX_GUN_TURN_DEGREES;
+            if (getDistance(lastX, lastY, predicted.x, predicted.y) < MAX_ACTUAL_SPEED / 2) {
+                break;
+            }
+        }
+        eventRecord.predicted = predicted;
+        // Wall-pinning logic 
+        const normalizedTargetDistance = predicted.distance / MAX_DISTANCE;
+        const aimOffset = (0.75 - normalizedTargetDistance / 2) * (normalizedTargetDistance ** 2);
+        const finalAngleToTarget = tank.angleTo(predicted.x, predicted.y);
+        const targetWallAngle = arena.nearestWallAngle(predicted.x, predicted.y);
+        let targetAngleToRef = normalizeAngle(targetWallAngle - finalAngleToTarget);
+        // Powerup denial logic
+        if (mem.powerups.length > 0) { 
+            const targePowerupAngle = getAngle(predicted.x, predicted.y, mem.powerups[0].x, mem.powerups[0].y);
+            targetAngleToRef = normalizeAngle(180 + targePowerupAngle - finalAngleToTarget);
+        }
+        const aimBias = (targetAngleToRef > 0) ? -aimOffset : aimOffset;
+        let desiredGunAngle = normalizeAngle(finalAngleToTarget + aimBias) - (tank.bodyAim + tank.gunAim);
+        desiredGunAngle = normalizeAngle(desiredGunAngle);        
+        tank.gunTurn = clamp(desiredGunAngle / MAX_GUN_TURN_DEGREES, -1, 1);
+        // Firing logic
+        const aimThreshold = DNA.gunAimThresh - (DNA.gunAimThresh - 1) * Math.sqrt(target.distance / MAX_DISTANCE);
+        const gunError = Math.abs(desiredGunAngle);
+        if (gunError < aimThreshold) {
+            const distanceFactor = Math.max(0.1, 1 - normalizedTargetDistance);
+            const trajectoryFactor = 1 - Math.abs(getPerpendicularComponent(target));
+            const accuracyFactor = (aimThreshold - gunError) / aimThreshold;
+            const recentAccuracy = getRecentAccuracy(50);
+            let firePower = DNA.aggression * MAX_MISSILE_ENERGY * (1 + recentAccuracy); 
+            firePower = firePower * (
+                distanceFactor * DNA.firingWeightDistance +
+                trajectoryFactor * DNA.firingWeightTrajectory +
+                accuracyFactor * DNA.firingWeightAccuracy
+            );
+            firePower = Math.min(MAX_MISSILE_ENERGY, firePower);
+            const energyInMissile = firePower * MISSILE_ENERGY_MULTIPLIER;
+            const energyToTravel = (predicted.distance / MISSILE_SPEED) * MISSILE_FLIGHT_COST;
+            const maxEnergyNeeded = predicted.energy / MISSILE_ENERGY_MULTIPLIER;
+            const costToMe = firePower / tank.energy;
+            const costToTarget = Math.max(0, energyInMissile - energyToTravel) / target.energy;
+            const depletionRate = costToMe / costToTarget * Math.max(0.1, recentAccuracy);
+            const energyRatio = tank.energy / target.energy;
+            const missileEnergyOk = energyToTravel < energyInMissile;
+            const hasGoodShot = depletionRate < energyRatio && missileEnergyOk;
+            const applyingPressure = missileEnergyOk && Math.random() < energyRatio;
+            if (hasGoodShot || applyingPressure) {
+                const travelTax = (predicted.distance / MISSILE_SPEED) * MISSILE_FLIGHT_COST;
+                const killShotPower = (maxEnergyNeeded + travelTax) * 1.05;
+                firePower = Math.min(firePower, killShotPower);
+                tank.fire(firePower);
+            }
+        }
+        eventRecord.iteration = tank.iteration;
+        mem.targetHistory.push(eventRecord);
+        if (mem.targetHistory.length > 100) {
+            mem.targetHistory = mem.targetHistory.slice(-100);
+        }
+        mem.target = eventRecord;
+    } else { tank.gunTurn = 1 }
+
+    // Scan arena
+    if (tank.iteration % DNA.scanInterval === 0 || tank.radarAim !== 0) tank.radarTurn = 1; 
+    // Conserve energy
+    if (incomingMissiles.length === 0 && mem.powerups.length === 0 && !mem.target?.isTooClose) tank.speed = 0;
+    // Counter-steer aiming
+    tank.gunTurn -= tank.bodyTurn * MAX_BODY_TURN_DEGREES / MAX_GUN_TURN_DEGREES;
+    tank.retained = mem;
     return tank;
 }

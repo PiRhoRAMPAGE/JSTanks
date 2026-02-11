@@ -153,20 +153,9 @@ class Missile {
                         this.energy -= other.energy;
                         other.state = "exploding";
                         if (!this.hasHit) {
-                            if (showAnimation.checked) {
-                                console.log("Missile intercepted by " + this.owner.name);
-                            }
                             this.owner.missileInterceptions++;
                             this.owner.missilesHit++;
                             this.hasHit = true;
-                        }
-                    }
-                    else if (other.energy > this.energy) {
-                        other.energy -= this.energy;
-                        this.state = "exploding";
-                        if (!other.hasHit) {
-                            other.owner.missilesHit++;
-                            other.hasHit = true;
                         }
                     }
                     else if (this.energy === other.energy) {

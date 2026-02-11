@@ -1,22 +1,9 @@
 function main(tank, arena) {
 
-    // **Understanding Angles and Distances**
-    // These are helper functions to figure out where other tanks are relative to this one.
-    // Imagine this tank has a built-in protractor and ruler!
-
-    // `tank.angleTo(x, y)`: This calculates the angle (like a direction on a compass)
-    // from our tank to a specific point (x, y) on the battlefield.
-    // Think of (x, y) as the coordinates of another tank or a location.
-    tank.angleTo = (x, y) => Math.atan2(y - tank.y, x - tank.x) * 180 / Math.PI;
-
-    // `tank.distanceTo(x, y)`: This calculates how far away our tank is from a
-    // specific point (x, y) on the battlefield. It's like measuring the straight-line
-    // distance to another tank.
-    tank.distanceTo = (x, y) => Math.sqrt((y - tank.y) ** 2 + (x - tank.x) ** 2);
-
     // `angleDifference(a1, a2)`: This figures out the shortest difference
     // between two angles. Imagine you're pointing in one direction (a1) and want
     // to quickly turn to another direction (a2) - this tells you how much you need to turn.
+
     angleDifference = (a1, a2) => {
         a1 = (a1 + 360000) % 360; // Makes sure the angle is always between 0 and 360 degrees.
         a2 = (a2 + 360000) % 360; // Same for the second angle.

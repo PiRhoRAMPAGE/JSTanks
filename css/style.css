@@ -245,6 +245,22 @@ canvas {
     margin-bottom: 10px;
 }
 
+#toggleDebugging {
+    position: static;
+    /* Allow it to flow within divOptions */
+    width: auto;
+    /* Adjust as needed */
+    margin-right: 10px;
+    /* Add spacing */
+    margin-bottom: 10px;
+}
+
+#toggleDebuggingLabel {
+    position: static;
+    /* Allow it to flow within divOptions */
+    margin-bottom: 10px;
+}
+
 #togglePowerups {
     position: static;
     /* Allow it to flow within divOptions */
